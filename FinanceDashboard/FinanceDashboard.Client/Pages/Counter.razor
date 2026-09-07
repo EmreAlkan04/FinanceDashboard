@@ -1,0 +1,96 @@
+﻿@page "/counter"
+@rendermode InteractiveWebAssembly
+
+<PageTitle>Counter</PageTitle>
+
+<h1>Counter</h1>
+
+<p role="status">
+
+    Total cost is: @TotalCost()
+    <br>
+
+    Categories:
+
+    @foreach (var category in ChartByeCategory())
+    {
+        <div>
+            <strong>@category.CategoryName: @category.Expense €</strong>
+        </div>
+    }
+
+    @*     Current count:
+    @foreach (var item in listRows)
+    {
+    <div>
+    @item
+    </div>
+
+    } *@
+</p>
+
+@* <button class="btn btn-primary" @onclick="IncrementCount">Click me</button> *@
+
+@code {
+    private List<string> listRows = new List<string>();
+
+    protected override void OnInitialized()
+    {
+        var reader = new StreamReader(File.OpenRead(@"C:\\GitHub\\FinanceDashboard\\FinanceDashboard\\FinanceDashboard\\wwwroot\\expenses.csv"));
+        while (!reader.EndOfStream)
+        {
+            listRows.Add(reader.ReadLine());
+        }
+    }
+
+    private double TotalCost()
+    {
+        double totalExpense = 0;
+        foreach (var item in listRows.Skip(1))
+        {
+            var testname = item.Split(",", 4);
+
+            double expense = Convert.ToDouble(testname.GetValue(2).ToString().Replace(".", ","));
+            // Int32.TryParse(testname.GetValue(2).ToString(), out expense);
+            totalExpense += expense;
+        }
+
+        totalExpense = Math.Round(totalExpense, 2);
+
+        return totalExpense;
+    }
+
+    private List<FinanceDashboard.Model.CategoryModel> ChartByeCategory()
+    {
+        HashSet<string> catNames = new HashSet<string>();
+        List<FinanceDashboard.Model.CategoryModel> test = new List<FinanceDashboard.Model.CategoryModel>();
+
+        foreach (var item in listRows.Skip(1))
+        {
+            string cat = item.Split(",", 3)[1];
+            catNames.Add(cat);
+        }
+
+        foreach (var categoryItem in catNames)
+        {
+            double catExpense = 0;
+            List<string> catEntries = listRows.Where(s => s.Contains(categoryItem)).ToList();
+
+            foreach (var item in catEntries)
+            {
+                var testname = item.Split(",", 4);
+
+                double expense = Convert.ToDouble(testname.GetValue(2).ToString().Replace(".", ","));
+                // Int32.TryParse(testname.GetValue(2).ToString(), out expense);
+                catExpense += expense;
+            }
+
+            catExpense = Math.Round(catExpense, 2);
+            test.Add(new Model.CategoryModel(categoryItem, catExpense));
+        }
+
+        test = test.OrderByDescending(s => s.Expense).ToList();
+
+        return test;
+    }
+}
