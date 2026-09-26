@@ -1,4 +1,5 @@
 ﻿@page "/counter"
+@using static System.Runtime.InteropServices.JavaScript.JSType
 @rendermode InteractiveWebAssembly
 
 <PageTitle>Counter</PageTitle>
@@ -8,6 +9,7 @@
 <p role="status">
 
     Total cost is: @TotalCost()
+    Total cost is: @TotalCost(2027)
     <br>
 
     Categories:
@@ -18,6 +20,22 @@
             <strong>@category.CategoryName: @category.Expense €</strong>
         </div>
     }
+
+    @foreach (var category in PercentageChart())
+    {
+        <div>
+            <strong>@category.CategoryName: @category.Expense %</strong>
+        </div>
+    }
+
+
+    @foreach (var month in MonthlyExpense(2027))
+    {
+        <div>
+            <strong>@month.ToString() € </strong>
+        </div>
+    }
+
 
     @*     Current count:
     @foreach (var item in listRows)
@@ -43,10 +61,12 @@
         }
     }
 
-    private double TotalCost()
+    private double TotalCost(int? year = null)
     {
+        year ??= DateTime.Now.Year;
+
         double totalExpense = 0;
-        foreach (var item in listRows.Skip(1))
+        foreach (var item in listRows.Where(s => s.Contains($"{year.ToString()}-")))
         {
             var testname = item.Split(",", 4);
 
@@ -92,5 +112,48 @@
         test = test.OrderByDescending(s => s.Expense).ToList();
 
         return test;
+    }
+
+    private List<double> MonthlyExpense(int? year = null)
+    {
+        year ??= DateTime.Now.Year;
+
+        DateTime target = new DateTime(year ?? DateTime.Now.Year, 1, 1);
+        List<double> montlyExpensesList = new List<double>();
+
+        for (var i = 1; i <= DateTime.Now.Month; i++)
+        {
+            double montly = 0.0;
+            foreach (var montlyExpense in listRows.Where(s => s.Contains($"{target.Year}-{target.AddMonths(i - 1).Month:D2}")))
+            {
+                var testname = montlyExpense.Split(",", 4);
+
+                double expense = Convert.ToDouble(testname.GetValue(2).ToString().Replace(".", ","));
+                // Int32.TryParse(testname.GetValue(2).ToString(), out expense);
+                montly += expense;
+
+            }
+            montly = Math.Round(montly, 2);
+
+            montlyExpensesList.Add(montly);
+        }
+
+        return montlyExpensesList;
+    }
+
+    private List<FinanceDashboard.Model.CategoryModel> PercentageChart()
+    {
+        List<FinanceDashboard.Model.CategoryModel> percentages = new List<FinanceDashboard.Model.CategoryModel>();
+        var total = TotalCost();
+
+        foreach(var item in ChartByeCategory())
+        {
+            var irtgendwas = (item.Expense/total)*100;
+            irtgendwas = Math.Round(irtgendwas, 2);
+            FinanceDashboard.Model.CategoryModel model = new Model.CategoryModel(item.CategoryName, irtgendwas);
+            percentages.Add(model);
+        }
+
+        return percentages;
     }
 }
