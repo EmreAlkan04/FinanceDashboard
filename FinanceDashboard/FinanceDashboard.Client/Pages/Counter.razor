@@ -1,10 +1,51 @@
 ﻿@page "/counter"
+@using FinanceDashboard.Client.Services
 @using static System.Runtime.InteropServices.JavaScript.JSType
 @rendermode InteractiveServer
+@inject IExpenseService ExpenseService
+
 
 <PageTitle>Counter</PageTitle>
 
 <h1>Counter</h1>
+
+<h3>First 5 entries (from the database)</h3>
+
+@if (dbError is not null)
+{
+    <div class="alert alert-danger">@dbError</div>
+}
+else if (firstEntries.Count == 0)
+{
+    <div class="alert alert-warning">The database has no entries.</div>
+}
+else
+{
+    <p>Showing @firstEntries.Count of @totalEntries entries.</p>
+    <table class="table table-sm table-striped w-auto">
+        <thead>
+            <tr>
+                <th>Id</th>
+                <th>Date</th>
+                <th>Category</th>
+                <th>Expense</th>
+                <th>Note</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var entry in firstEntries)
+            {
+                <tr>
+                    <td>@entry.Id</td>
+                    <td>@entry.Date.ToString("yyyy-MM-dd")</td>
+                    <td>@entry.CategoryName</td>
+                    <td>@entry.Expense.ToString("F2") €</td>
+                    <td>@(entry.Note ?? "–")</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
 
 <p role="status">
 
@@ -18,7 +59,7 @@
             </button>
         }
     </div>
-    Total cost for @selectedTotalCostYear is: @TotalCost(selectedTotalCostYear)
+    Total cost for @selectedTotalCostYear is: @ExpenseService.TotalCost(selectedTotalCostYear)
     <br>
 
     Categories:
@@ -73,6 +114,11 @@
 
 @code {
     private List<string> listRows = new List<string>();
+
+    private List<FinanceDashboard.Model.CategoryModel> firstEntries = new List<FinanceDashboard.Model.CategoryModel>();
+    private int totalEntries;
+    private string? dbError;
+
     private List<FinanceDashboard.Model.CategoryModel> categoryModel = new List<FinanceDashboard.Model.CategoryModel>();
 
     // currently selected years, bound to the buttons below
@@ -113,6 +159,22 @@
         }
 
     }
+
+    // loads the first 5 entries (ordered by Id) from the database to show that the CSV import worked
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            // firstEntries = await ExpenseService.GetFirstAsync(5);
+            // totalEntries = await ExpenseService.GetCountAsync();
+        }
+        catch (Exception ex)
+        {
+            dbError = $"Could not load entries from the database: {ex.Message}";
+        }
+    }
+
+
 
     // reads the year out of the date column of every row and returns the distinct years found, newest first
     private List<int> GetAvailableYears()
@@ -155,24 +217,24 @@
     }
 
 
-    private double TotalCost(int? year = null)
-    {
-        year ??= DateTime.Now.Year;
+    // private double TotalCost(int? year = null)
+    // {
+    //     year ??= DateTime.Now.Year;
 
-        double totalExpense = 0;
-        foreach (var item in categoryModel.Where(s => s.Date.Year.Equals(year)))
-        {
-            // var testname = item.Split(",", 4);
+    //     double totalExpense = 0;
+    //     foreach (var item in categoryModel.Where(s => s.Date.Year.Equals(year)))
+    //     {
+    //         // var testname = item.Split(",", 4);
 
-            double expense = Convert.ToDouble(item.Expense.ToString().Replace(".", ","));
-            // Int32.TryParse(testname.GetValue(2).ToString(), out expense);
-            totalExpense += expense;
-        }
+    //         double expense = Convert.ToDouble(item.Expense.ToString().Replace(".", ","));
+    //         // Int32.TryParse(testname.GetValue(2).ToString(), out expense);
+    //         totalExpense += expense;
+    //     }
 
-        totalExpense = Math.Round(totalExpense, 2);
+    //     totalExpense = Math.Round(totalExpense, 2);
 
-        return totalExpense;
-    }
+    //     return totalExpense;
+    // }
 
     private List<FinanceDashboard.Model.CategoryModel> ChartByeCategory()
     {
@@ -238,7 +300,7 @@
     private List<FinanceDashboard.Model.CategoryModel> PercentageChart()
     {
         List<FinanceDashboard.Model.CategoryModel> percentages = new List<FinanceDashboard.Model.CategoryModel>();
-        var total = TotalCost();
+        var total = ExpenseService.TotalCost();
 
         foreach (var item in ChartByeCategory())
         {

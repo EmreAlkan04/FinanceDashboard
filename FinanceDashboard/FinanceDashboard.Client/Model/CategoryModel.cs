@@ -2,6 +2,8 @@
 {
     public class CategoryModel
     {
+
+        public CategoryModel() { }
         public CategoryModel(string categoryName, double expense)
         {
             CategoryName = categoryName;
@@ -16,7 +18,8 @@
             Note = note;
         }
 
-        public string CategoryName { get; set; }
+        public int Id { get; set; }
+        public string CategoryName { get; set; } = string.Empty;
         public double Expense { get; set; }
         public DateTime Date { get; set; }
         public string? Note { get; set; }
