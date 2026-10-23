@@ -26,7 +26,7 @@ namespace FinanceDashboard.Data
                 return 0;
             }
 
-            var expenses = new List<CategoryModel>();
+            var expenses = new List<ExpensesModel>();
             var skipped = 0;
             var lineNumber = 0;
 
@@ -65,7 +65,7 @@ namespace FinanceDashboard.Data
         /// <summary>
         /// Parses one line of the form:  2025-01-02, Musik, 70, yousician
         /// </summary>
-        private static bool TryParseLine(string line, out CategoryModel expense, out string error)
+        private static bool TryParseLine(string line, out ExpensesModel expense, out string error)
         {
             expense = null!;
             error = string.Empty;
@@ -118,7 +118,7 @@ namespace FinanceDashboard.Data
                 return false;
             }
 
-            expense = new CategoryModel(category, amount, date, noteValue);
+            expense = new ExpensesModel(category, amount, date, noteValue);
             return true;
         }
     }

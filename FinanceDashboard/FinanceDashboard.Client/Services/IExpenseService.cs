@@ -10,11 +10,23 @@ namespace FinanceDashboard.Client.Services
     public interface IExpenseService
     {
         /// <summary>The first <paramref name="count"/> expenses, ordered by Id.</summary>
-        Task<List<CategoryModel>> GetFirstAsync(int count);
+        List<ExpensesModel> GetFirst(int count);
 
         /// <summary>Total number of expenses in the database.</summary>
-        Task<int> GetCountAsync();
+        int GetCount();
 
-        double TotalCost(int? year = null);
+        double TotalExpenseOfTheYear(int? year = null);
+
+        List<FinanceDashboard.Model.ExpensesModel> ExpenseByCategory(int? year = null);
+        List<double> MonthlyExpense(int? year = null);
+        List<FinanceDashboard.Model.ExpensesModel> PercentageChart();
+        List<FinanceDashboard.Model.ExpensesModel> Ranking(double? minExp = 00.00, int? year = null);
+
+        /// <summary>
+        /// Returns a List of all entries from the current year.
+        /// </summary>
+        /// <returns></returns>
+        List<ExpensesModel> AllExpensesOfTheYear();
+        Task<List<int>> GetAllYears();
     }
 }

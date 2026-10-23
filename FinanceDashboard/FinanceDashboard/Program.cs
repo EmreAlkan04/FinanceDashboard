@@ -12,6 +12,7 @@ builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
 builder.Services.AddScoped<IExpenseService, ExpenseService>();
+builder.Services.AddControllers();
 
 builder.Services.AddDbContext<FinanceDbContext>(options =>
 {
@@ -76,6 +77,7 @@ app.UseHttpsRedirection();
 
 app.UseStaticFiles();
 app.UseAntiforgery();
+app.MapControllers();
 
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode()

@@ -1,325 +1,294 @@
 ﻿@page "/counter"
-@using FinanceDashboard.Client.Services
-@using static System.Runtime.InteropServices.JavaScript.JSType
 @rendermode InteractiveServer
+@using System.Globalization
+@using FinanceDashboard.Client.Components
+@using FinanceDashboard.Client.Services
+@using FinanceDashboard.Model
 @inject IExpenseService ExpenseService
-
 
 <PageTitle>Counter</PageTitle>
 
 <h1>Counter</h1>
 
-<h3>First 5 entries (from the database)</h3>
-
-@if (dbError is not null)
+@if (errorMessage is not null)
 {
-    <div class="alert alert-danger">@dbError</div>
+    <div class="alert alert-danger" role="alert">@errorMessage</div>
 }
-else if (firstEntries.Count == 0)
+
+@if (isLoading)
 {
-    <div class="alert alert-warning">The database has no entries.</div>
+    <p><em>Loading...</em></p>
 }
 else
 {
-    <p>Showing @firstEntries.Count of @totalEntries entries.</p>
-    <table class="table table-sm table-striped w-auto">
-        <thead>
-            <tr>
-                <th>Id</th>
-                <th>Date</th>
-                <th>Category</th>
-                <th>Expense</th>
-                <th>Note</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var entry in firstEntries)
+    <section>
+        <YearSelector Years="availableYears" SelectedYear="universalYear" OnSelected="SelectUniversalYear" />
+
+        <section class="mb-5">
+            <h3>First @FirstEntriesCount entries</h3>
+
+            @if (totalEntries == 0)
             {
-                <tr>
-                    <td>@entry.Id</td>
-                    <td>@entry.Date.ToString("yyyy-MM-dd")</td>
-                    <td>@entry.CategoryName</td>
-                    <td>@entry.Expense.ToString("F2") €</td>
-                    <td>@(entry.Note ?? "–")</td>
-                </tr>
+                <div class="alert alert-warning">The database has no entries yet.</div>
             }
-        </tbody>
-    </table>
+            else
+            {
+                <p>Showing @firstEntries.Count of @totalEntries entries.</p>
+                <table class="table table-sm table-striped w-auto">
+                    <thead>
+                        <tr>
+                            <th>Id</th>
+                            <th>Date</th>
+                            <th>Category</th>
+                            <th class="text-end">Expense</th>
+                            <th>Note</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var entry in firstEntries)
+                        {
+                            <tr>
+                                <td>@entry.Id</td>
+                                <td>@entry.Date.ToString("yyyy-MM-dd")</td>
+                                <td>@entry.Category</td>
+                                <td class="text-end">@Money(entry.Expense)</td>
+                                <td>@(entry.Note ?? "–")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+        </section>
+
+        <section class="mb-5">
+            <h3>Total cost</h3>
+            @* <YearSelector Years="availableYears" SelectedYear="universalYear" OnSelected="SelectTotalCostYear" /> *@
+            <p>Total cost for @universalYear: <strong>@Money(totalCost)</strong></p>
+        </section>
+
+        <section class="mb-5">
+            <h3>Categories</h3>
+            <table class="table table-sm table-striped w-auto">
+                <thead>
+                    <tr>
+                        <th>Category</th>
+                        <th class="text-end">Total</th>
+                        <th class="text-end">Share</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var row in categories)
+                    {
+                        <tr>
+                            <td>@row.Category</td>
+                            <td class="text-end">@Money(row.Total)</td>
+                            <td class="text-end">@Percent(row.Percent)</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </section>
+
+        <section class="mb-5">
+            <h3>Monthly expenses</h3>
+            @* <YearSelector Years="availableYears" SelectedYear="monthlyYear" OnSelected="SelectMonthlyYear" /> *@
+            <table class="table table-sm table-striped w-auto">
+                <thead>
+                    <tr>
+                        <th>Month</th>
+                        <th class="text-end">Expenses</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @for (var month = 1; month <= monthlyExpenses.Count; month++)
+                    {
+                        <tr>
+                            <td>@MonthName(month)</td>
+                            <td class="text-end">@Money(monthlyExpenses[month - 1])</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </section>
+
+        <section class="mb-5">
+            <h3>Ranking</h3>
+            <div class="mb-3">
+                <label class="form-label" for="min-expense">Minimum expense (€)</label>
+                <div class="input-group w-auto">
+                    <input id="min-expense" class="form-control" type="number" step="0.1"
+                           @bind="minRankingExpense" @bind:event="oninput" />
+                    <button type="button" class="btn btn-primary" @onclick="ShowRanking">Show ranking</button>
+                </div>
+            </div>
+
+            @if (ranking.Count == 0)
+            {
+                <p class="text-muted">No entries with a note cost at least @(Money(minRankingExpense)).</p>
+            }
+            else
+            {
+                <table class="table table-sm table-striped w-auto">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Item</th>
+                            <th>Date</th>
+                            <th class="text-end">Expense</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @for (var rank = 1; rank <= Math.Min(ranking.Count, RankingRowsShown); rank++)
+                        {
+                            var item = ranking[rank - 1];
+                            <tr>
+                                <td>@rank</td>
+                                <td>@item.Note</td>
+                                <td>@item.Date.ToString("yyyy-MM-dd")</td>
+                                <td class="text-end">@Money(item.Expense)</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+
+                @if (ranking.Count > RankingRowsShown)
+                {
+                    <p class="text-muted">... and @(ranking.Count - RankingRowsShown) more.</p>
+                    <button type="button" @onclick="ShowMoreFromRanking">Show more entries</button>
+                }
+            }
+        </section>
+    </section>
 }
 
-<p role="status">
-
-    <h3>Total Cost</h3>
-    <div>
-        @foreach (var year in AvailableYears)
-        {
-            <button class="btn @(year == selectedTotalCostYear ? "btn-primary" : "btn-outline-primary")"
-                    @onclick="() => SelectTotalCostYear(year)">
-                @year
-            </button>
-        }
-    </div>
-    Total cost for @selectedTotalCostYear is: @ExpenseService.TotalCost(selectedTotalCostYear)
-    <br>
-
-    Categories:
-
-    @foreach (var category in ChartByeCategory())
-    {
-        <div>
-            <strong>@category.CategoryName: @category.Expense €</strong>
-        </div>
-    }
-
-    @foreach (var category in PercentageChart())
-    {
-        <div>
-            <strong>@category.CategoryName: @category.Expense %</strong>
-        </div>
-    }
-
-    <h3>Monthly Expenses</h3>
-    <div>
-        @foreach (var year in AvailableYears)
-        {
-            <button class="btn @(year == selectedMonthlyExpenseYear ? "btn-primary" : "btn-outline-primary")"
-                    @onclick="() => SelectMonthlyExpenseYear(year)">
-                @year
-            </button>
-        }
-    </div>
-
-    @foreach (var month in MonthlyExpense(selectedMonthlyExpenseYear))
-    {
-        <div>
-            <strong>@month.ToString() € </strong>
-        </div>
-    }
-
-
-
-    <label>
-        Enter a double:
-        <input type="number" step="0.1" @bind="minValueOnRanking" @bind:event="oninput" />
-    </label>
-    <button class="btn btn-primary" @onclick="SubmitRanking">Show Ranking</button>
-
-    @foreach (var item in Ranking(submittedMinValueOnRanking))
-    {
-        <div> @item.Note bought for @item.Expense</div>
-    }
-
-</p>
-
-
 @code {
-    private List<string> listRows = new List<string>();
+    private const int FirstEntriesCount = 5;
+    private int RankingRowsShown = 10;
 
-    private List<FinanceDashboard.Model.CategoryModel> firstEntries = new List<FinanceDashboard.Model.CategoryModel>();
+    // One row of the category table. Total and share come from two separate service calls.
+    private record CategoryRow(string Category, double Total, double Percent);
+
+    private bool isLoading = true;
+    private string? errorMessage;
+
+    private List<ExpensesModel> firstEntries = new();
     private int totalEntries;
-    private string? dbError;
 
-    private List<FinanceDashboard.Model.CategoryModel> categoryModel = new List<FinanceDashboard.Model.CategoryModel>();
+    private List<int> availableYears = new();
 
-    // currently selected years, bound to the buttons below
-    private int selectedTotalCostYear = DateTime.Now.Year;
-    private int selectedMonthlyExpenseYear = DateTime.Now.Year;
-    private double minValueOnRanking = 0.0;
-    private double submittedMinValueOnRanking = 0.0;
+    private int universalYear;
+    private double totalCost;
 
+    private List<CategoryRow> categories = new();
 
-    // the list of years the buttons are generated from, based on what's actually in the CSV
-    private List<int> AvailableYears = new List<int>();
+    // private int monthlyYear;
+    private List<double> monthlyExpenses = new();
 
-    protected override void OnInitialized()
-    {
-        var reader = new StreamReader(File.OpenRead(@"C:\\GitHub\\FinanceDashboard\\FinanceDashboard\\FinanceDashboard\\wwwroot\\expenses.csv"));
-        while (!reader.EndOfStream)
-        {
-            listRows.Add(reader.ReadLine());
-        }
+    private double minRankingExpense;
+    private List<ExpensesModel> ranking = new();
 
-        foreach (var item in listRows)
-        {
-            var testname = item.Split(",", 4);
-            FinanceDashboard.Model.CategoryModel model = new Model.CategoryModel(testname.GetValue(1).ToString(),
-            Convert.ToDouble(testname.GetValue(2).ToString().Replace(".", ",")), DateTime.ParseExact(testname.GetValue(0).ToString(), "yyyy-MM-dd", null), testname.GetValue(3).ToString());
-            categoryModel.Add(model);
-        }
+    // ------------------------------------------------------------------
+    // Loading: the ONLY place where the page talks to IExpenseService.
+    // The markup above just displays the fields filled here.
+    // ------------------------------------------------------------------
 
-        AvailableYears = GetAvailableYears();
-
-        if (AvailableYears.Any())
-        {
-            if (!AvailableYears.Contains(selectedTotalCostYear))
-                selectedTotalCostYear = AvailableYears.First();
-
-            if (!AvailableYears.Contains(selectedMonthlyExpenseYear))
-                selectedMonthlyExpenseYear = AvailableYears.First();
-        }
-
-    }
-
-    // loads the first 5 entries (ordered by Id) from the database to show that the CSV import worked
     protected override async Task OnInitializedAsync()
     {
         try
         {
-            // firstEntries = await ExpenseService.GetFirstAsync(5);
-            // totalEntries = await ExpenseService.GetCountAsync();
+            // One call after the other: the service shares a single DbContext, which can't run two queries at once.
+            firstEntries = ExpenseService.GetFirst(FirstEntriesCount);
+            totalEntries = ExpenseService.GetCount();
+            availableYears = (await ExpenseService.GetAllYears()).OrderByDescending(year => year).ToList();
+
+            universalYear /* = monthlyYear */ = PickInitialYear();
+
+            LoadTotalCost();
+            LoadCategories();
+            LoadMonthlyExpenses();
+            LoadRanking(); // last: if it fails, the rest of the page is already filled
         }
         catch (Exception ex)
         {
-            dbError = $"Could not load entries from the database: {ex.Message}";
+            ReportError(ex);
         }
-    }
-
-
-
-    // reads the year out of the date column of every row and returns the distinct years found, newest first
-    private List<int> GetAvailableYears()
-    {
-        HashSet<int> years = new HashSet<int>();
-
-        foreach (var row in listRows)
+        finally
         {
-            if (string.IsNullOrWhiteSpace(row)) continue;
-
-            var dateField = row.Split(",", 2).GetValue(0)?.ToString();
-
-            if (!string.IsNullOrEmpty(dateField) && dateField.Length >= 4 &&
-                int.TryParse(dateField.Substring(0, 4), out int year))
-            {
-                years.Add(year);
-            }
+            isLoading = false;
         }
-
-        return years.OrderByDescending(y => y).ToList();
     }
+
+    private void LoadTotalCost() =>
+        totalCost = ExpenseService.TotalExpenseOfTheYear(universalYear);
+
+    private void LoadCategories()
+    {
+        // PercentageChart() returns the share in the Expense property; it is given a proper name here.
+        var shares = ExpenseService.PercentageChart().ToDictionary(item => item.Category, item => item.Expense);
+
+        categories = ExpenseService.ExpenseByCategory(universalYear)
+            .Select(item => new CategoryRow(item.Category, item.Expense, shares.GetValueOrDefault(item.Category)))
+            .ToList();
+    }
+
+    private void LoadMonthlyExpenses() =>
+        monthlyExpenses = ExpenseService.MonthlyExpense(universalYear);
+
+    private void LoadRanking() =>
+        ranking = ExpenseService.Ranking(minRankingExpense);
 
     private void SelectTotalCostYear(int year)
     {
-        selectedTotalCostYear = year;
-        // Blazor re-renders the component automatically after a UI event handler runs,
-        // so no manual StateHasChanged() call or page reload is needed here.
+        universalYear = year;
+        Reload(LoadTotalCost);
     }
 
-    private void SelectMonthlyExpenseYear(int year)
+    private void SelectUniversalYear(int year)
     {
-        selectedMonthlyExpenseYear = year;
+        universalYear = year;
+        Reload(LoadTotalCost);
+        Reload(LoadCategories);
+        Reload(LoadMonthlyExpenses);
     }
 
-    private void SubmitRanking()
+    private void ShowRanking()
     {
-        submittedMinValueOnRanking = minValueOnRanking;
-        // Blazor re-renders after the click handler runs, so the Ranking()
-        // loop below picks up the new value immediately, no reload needed.
+        RankingRowsShown = 10;
+        Reload(LoadRanking);
     }
+    private void ShowMoreFromRanking() => RankingRowsShown += 10;
 
-
-    // private double TotalCost(int? year = null)
-    // {
-    //     year ??= DateTime.Now.Year;
-
-    //     double totalExpense = 0;
-    //     foreach (var item in categoryModel.Where(s => s.Date.Year.Equals(year)))
-    //     {
-    //         // var testname = item.Split(",", 4);
-
-    //         double expense = Convert.ToDouble(item.Expense.ToString().Replace(".", ","));
-    //         // Int32.TryParse(testname.GetValue(2).ToString(), out expense);
-    //         totalExpense += expense;
-    //     }
-
-    //     totalExpense = Math.Round(totalExpense, 2);
-
-    //     return totalExpense;
-    // }
-
-    private List<FinanceDashboard.Model.CategoryModel> ChartByeCategory()
+    // Runs a loader triggered by the user; a failure is shown on the page instead of breaking the connection.
+    private void Reload(Action loader)
     {
-        HashSet<string> catNames = new HashSet<string>();
-        List<FinanceDashboard.Model.CategoryModel> test = new List<FinanceDashboard.Model.CategoryModel>();
-
-        foreach (var item in categoryModel)
+        try
         {
-            // string cat = item.Split(",", 3)[1];
-            catNames.Add(item.CategoryName);
+            errorMessage = null;
+            loader();
         }
-
-        foreach (var categoryItem in catNames)
+        catch (Exception ex)
         {
-            double catExpense = 0;
-            List<string> catEntries = listRows.Where(s => s.Contains(categoryItem)).ToList();
-
-            foreach (var item in catEntries)
-            {
-                var testname = item.Split(",", 4);
-
-                double expense = Convert.ToDouble(testname.GetValue(2).ToString().Replace(".", ","));
-                // Int32.TryParse(testname.GetValue(2).ToString(), out expense);
-                catExpense += expense;
-            }
-
-            catExpense = Math.Round(catExpense, 2);
-            test.Add(new Model.CategoryModel(categoryItem, catExpense));
+            ReportError(ex);
         }
-
-        test = test.OrderByDescending(s => s.Expense).ToList();
-
-        return test;
     }
 
-    private List<double> MonthlyExpense(int? year = null)
-    {
-        year ??= DateTime.Now.Year;
+    private void ReportError(Exception ex) =>
+        errorMessage = $"Could not load data from the database: {ex.Message}";
 
-        DateTime target = new DateTime(year ?? DateTime.Now.Year, 1, 1);
-        List<double> montlyExpensesList = new List<double>();
+    // The current year if it has entries, otherwise the newest year that does.
+    private int PickInitialYear() =>
+        availableYears.Count == 0 || availableYears.Contains(DateTime.Now.Year)
+            ? DateTime.Now.Year
+            : availableYears[0];
 
-        for (var i = 1; i <= DateTime.Now.Month; i++)
-        {
-            double montly = 0.0;
-            foreach (var montlyExpense in categoryModel.Where(s => s.Date.Year.Equals(target.Year) && s.Date.Month.Equals(target.AddMonths(i - 1).Month)))
-            {
-                // var testname = montlyExpense.Split(",", 4);
+    // ------------------------------------------------------------------
+    // Formatting
+    // ------------------------------------------------------------------
 
-                double expense = Convert.ToDouble(montlyExpense.Expense.ToString().Replace(".", ","));
-                // Int32.TryParse(testname.GetValue(2).ToString(), out expense);
-                montly += expense;
+    private static string Money(double value) => $"{value:N2} €";
 
-            }
-            montly = Math.Round(montly, 2);
+    private static string Percent(double value) => double.IsFinite(value) ? $"{value:N2} %" : "–";
 
-            montlyExpensesList.Add(montly);
-        }
-
-        return montlyExpensesList;
-    }
-
-    private List<FinanceDashboard.Model.CategoryModel> PercentageChart()
-    {
-        List<FinanceDashboard.Model.CategoryModel> percentages = new List<FinanceDashboard.Model.CategoryModel>();
-        var total = ExpenseService.TotalCost();
-
-        foreach (var item in ChartByeCategory())
-        {
-            var irtgendwas = (item.Expense / total) * 100;
-            irtgendwas = Math.Round(irtgendwas, 2);
-            FinanceDashboard.Model.CategoryModel model = new Model.CategoryModel(item.CategoryName, irtgendwas);
-            percentages.Add(model);
-        }
-
-        return percentages;
-    }
-
-    private List<FinanceDashboard.Model.CategoryModel> Ranking(double? minExp = 00.00)
-    {
-        List<FinanceDashboard.Model.CategoryModel> ranked = new List<FinanceDashboard.Model.CategoryModel>();
-
-        foreach (var item in categoryModel.Where(s => s.Expense >= minExp && s.CategoryName != "Lebensmittel").OrderByDescending(s => s.Expense))
-            ranked.Add(item);
-
-        return ranked;
-    }
+    private static string MonthName(int month) =>
+        CultureInfo.CurrentCulture.DateTimeFormat.GetMonthName(month);
 }

@@ -1,0 +1,24 @@
+﻿@* Row of year buttons. Presentation only: it reports the clicked year and knows nothing about the data. *@
+
+<div class="mb-3">
+    @foreach (var year in Years)
+    {
+        <button type="button"
+                class="btn me-1 @(year == SelectedYear ? "btn-primary" : "btn-outline-primary")"
+                aria-pressed="@(year == SelectedYear ? "true" : "false")"
+                @onclick="() => OnSelected.InvokeAsync(year)">
+            @year
+        </button>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public IReadOnlyList<int> Years { get; set; } = Array.Empty<int>();
+
+    [Parameter]
+    public int SelectedYear { get; set; }
+
+    [Parameter]
+    public EventCallback<int> OnSelected { get; set; }
+}

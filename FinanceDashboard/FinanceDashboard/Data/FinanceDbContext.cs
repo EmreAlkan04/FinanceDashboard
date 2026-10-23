@@ -15,16 +15,16 @@ namespace FinanceDashboard.Data
 
         }
 
-        public DbSet<CategoryModel> Expenses => Set<CategoryModel>();
+        public DbSet<ExpensesModel> Expenses => Set<ExpensesModel>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
-            modelBuilder.Entity<CategoryModel>(entity =>
+            modelBuilder.Entity<ExpensesModel>(entity =>
             {
                 entity.ToTable("Expenses");
                 entity.HasKey(e => e.Id);
 
-                entity.Property(e => e.CategoryName)
+                entity.Property(e => e.Category)
                       .IsRequired()
                       .HasMaxLength(CategoryNameMaxLength);
 
@@ -37,7 +37,7 @@ namespace FinanceDashboard.Data
 
                 // The dashboard filters by year/month and groups by category.
                 entity.HasIndex(e => e.Date);
-                entity.HasIndex(e => e.CategoryName);
+                entity.HasIndex(e => e.Category);
             });
         }
     }
