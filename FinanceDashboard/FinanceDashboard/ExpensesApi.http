@@ -1,0 +1,56 @@
+@host = https://localhost:7167
+
+### Monthly expenses of a year (omit ?year for the current year)
+GET {{host}}/api/expenses/monthly?year=2026
+
+### Costs per category of a year
+GET {{host}}/api/expenses/categories?year=2026
+
+### Add an entry -> 201 Created; the response contains the new id
+POST {{host}}/api/expenses
+Content-Type: application/json
+
+{
+  "date": "2026-10-15",
+  "category": "Essen",
+  "expense": 12.5,
+  "note": "Pizza"
+}
+
+### Read one entry (replace 631 with the id from the POST response)
+GET {{host}}/api/expenses/631
+
+### Edit that entry -> 204 No Content
+PUT {{host}}/api/expenses/631
+Content-Type: application/json
+
+{
+  "date": "2026-10-15",
+  "category": "Essen",
+  "expense": 14.9,
+  "note": "Pizza + Cola"
+}
+
+### ---- Error cases ----
+
+### 400: year out of range
+GET {{host}}/api/expenses/monthly?year=0
+
+### 400: category missing, expense negative, date missing
+POST {{host}}/api/expenses
+Content-Type: application/json
+
+{
+  "category": "",
+  "expense": -5
+}
+
+### 404: unknown id
+PUT {{host}}/api/expenses/99999
+Content-Type: application/json
+
+{
+  "date": "2026-10-15",
+  "category": "Essen",
+  "expense": 1
+}

@@ -4,6 +4,7 @@
 @using FinanceDashboard.Client.Components
 @using FinanceDashboard.Client.Services
 @using FinanceDashboard.Model
+@using System.Net
 @inject IExpenseService ExpenseService
 
 <PageTitle>Counter</PageTitle>
@@ -62,7 +63,6 @@ else
 
         <section class="mb-5">
             <h3>Total cost</h3>
-            @* <YearSelector Years="availableYears" SelectedYear="universalYear" OnSelected="SelectTotalCostYear" /> *@
             <p>Total cost for @universalYear: <strong>@Money(totalCost)</strong></p>
         </section>
 
@@ -91,7 +91,6 @@ else
 
         <section class="mb-5">
             <h3>Monthly expenses</h3>
-            @* <YearSelector Years="availableYears" SelectedYear="monthlyYear" OnSelected="SelectMonthlyYear" /> *@
             <table class="table table-sm table-striped w-auto">
                 <thead>
                     <tr>
@@ -135,17 +134,34 @@ else
                             <th>Item</th>
                             <th>Date</th>
                             <th class="text-end">Expense</th>
+                            <th>Image</th>
                         </tr>
                     </thead>
                     <tbody>
                         @for (var rank = 1; rank <= Math.Min(ranking.Count, RankingRowsShown); rank++)
                         {
                             var item = ranking[rank - 1];
+                            string? imageSrc = item.Image is { Length: > 0 } imageBytes
+                            ? $"data:image/jpeg;base64,{Convert.ToBase64String(imageBytes)}"
+                            : null;
+
                             <tr>
                                 <td>@rank</td>
                                 <td>@item.Note</td>
                                 <td>@item.Date.ToString("yyyy-MM-dd")</td>
                                 <td class="text-end">@Money(item.Expense)</td>
+                                <td>
+                                    @if (imageSrc is not null)
+                                    {
+                                        <img src="@imageSrc"
+                                             alt="@item.Note"
+                                             style="max-width: 100px; max-height: 100px; object-fit: contain;" />
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted">No image</span>
+                                    }
+                                </td>
                             </tr>
                         }
                     </tbody>
@@ -181,31 +197,26 @@ else
 
     private List<CategoryRow> categories = new();
 
-    // private int monthlyYear;
     private List<double> monthlyExpenses = new();
 
     private double minRankingExpense;
     private List<ExpensesModel> ranking = new();
 
-    // ------------------------------------------------------------------
-    // Loading: the ONLY place where the page talks to IExpenseService.
-    // The markup above just displays the fields filled here.
-    // ------------------------------------------------------------------
 
     protected override async Task OnInitializedAsync()
     {
         try
         {
-            // One call after the other: the service shares a single DbContext, which can't run two queries at once.
             firstEntries = ExpenseService.GetFirst(FirstEntriesCount);
             totalEntries = ExpenseService.GetCount();
             availableYears = (await ExpenseService.GetAllYears()).OrderByDescending(year => year).ToList();
 
-            universalYear /* = monthlyYear */ = PickInitialYear();
+            universalYear = PickInitialYear();
 
             LoadTotalCost();
             LoadCategories();
             LoadMonthlyExpenses();
+            await LoadMissingImages();
             LoadRanking(); // last: if it fails, the rest of the page is already filled
         }
         catch (Exception ex)
@@ -234,8 +245,10 @@ else
     private void LoadMonthlyExpenses() =>
         monthlyExpenses = ExpenseService.MonthlyExpense(universalYear);
 
+    private async Task LoadMissingImages() => await ExpenseService.ImageReceiverAsync();
+
     private void LoadRanking() =>
-        ranking = ExpenseService.Ranking(minRankingExpense);
+        ranking = ExpenseService.Ranking(minRankingExpense, universalYear);
 
     private void SelectTotalCostYear(int year)
     {
@@ -249,6 +262,7 @@ else
         Reload(LoadTotalCost);
         Reload(LoadCategories);
         Reload(LoadMonthlyExpenses);
+        Reload(LoadRanking);
     }
 
     private void ShowRanking()
@@ -258,7 +272,6 @@ else
     }
     private void ShowMoreFromRanking() => RankingRowsShown += 10;
 
-    // Runs a loader triggered by the user; a failure is shown on the page instead of breaking the connection.
     private void Reload(Action loader)
     {
         try
@@ -275,15 +288,11 @@ else
     private void ReportError(Exception ex) =>
         errorMessage = $"Could not load data from the database: {ex.Message}";
 
-    // The current year if it has entries, otherwise the newest year that does.
     private int PickInitialYear() =>
         availableYears.Count == 0 || availableYears.Contains(DateTime.Now.Year)
             ? DateTime.Now.Year
             : availableYears[0];
 
-    // ------------------------------------------------------------------
-    // Formatting
-    // ------------------------------------------------------------------
 
     private static string Money(double value) => $"{value:N2} €";
 

@@ -28,5 +28,9 @@ namespace FinanceDashboard.Client.Services
         /// <returns></returns>
         List<ExpensesModel> AllExpensesOfTheYear();
         Task<List<int>> GetAllYears();
+        ExpensesModel? GetById(int id);
+        ExpensesModel AddExpense(ExpenseDTO expenseDTO);
+        ExpensesModel? UpdateExpense(int id, ExpenseDTO expenseDTO);
+        Task<int> ImageReceiverAsync(CancellationToken cancellationToken = default);
     }
 }

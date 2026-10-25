@@ -50,7 +50,6 @@ namespace FinanceDashboard.Data
                 }
             }
 
-            // The CSV is not sorted by date; insert chronologically so the Ids are, too.
             db.Expenses.AddRange(expenses.OrderBy(e => e.Date));
             await db.SaveChangesAsync();
 

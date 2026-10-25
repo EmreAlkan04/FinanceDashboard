@@ -1,24 +1,22 @@
-﻿using FinanceDashboard.Client.Services;
+﻿using System.ComponentModel.DataAnnotations;
+using System.Globalization;
+using FinanceDashboard.Client.Services;
 using FinanceDashboard.Model;
 using Microsoft.AspNetCore.Mvc;
-using System.Globalization;
 
 namespace FinanceDashboard.Controllers
 {
     /// <summary>
-    /// HTTP API for expenses, reachable under /api/expenses.
-    ///
-    /// Keep this class thin: it only translates between HTTP (status codes, query/body)
-    /// and IExpenseService. Validation rules and database access belong in the service,
-    /// so a Razor page that adds an entry later goes through the same code.
-    ///
-    /// The methods are not marked "async" yet (nothing is awaited). Add the keyword
-    /// as soon as you await the service.
+    /// /api/expenses.
+    /// ApiExceptionFilter, so the actions don't need try/catch.
     /// </summary>
     [ApiController]
     [Route("api/[controller]")]
     public class ExpensesController : ControllerBase
     {
+        private const int MinYear = 1;
+        private const int MaxYear = 9999;
+
         private readonly IExpenseService _expenseService;
 
         public ExpensesController(IExpenseService expenseService)
@@ -26,99 +24,107 @@ namespace FinanceDashboard.Controllers
             _expenseService = expenseService;
         }
 
+        /// <summary>
+        /// GET api/expenses/monthly?year=2026
+        /// Expense of each from the entered year.
+        /// </summary>
+        /// <param name="year"></param>
+        /// <returns></returns>
         [HttpGet("monthly")]
-        [ProducesResponseType(StatusCodes.Status200OK)]
-        public ActionResult<Dictionary<string, double>> GetMonthly([FromQuery] int? year)
+        [ProducesResponseType(typeof(Dictionary<string, double>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
+        public ActionResult<Dictionary<string, double>> GetMonthly([FromQuery, Range(MinYear, MaxYear)] int? year)
         {
-            year ??= DateTime.Now.Year;
-            Dictionary<string, double> keyValuePairs = new Dictionary<string, double>();
-            
-            List<double> expenses;
-            List<string> names = DateTimeFormatInfo.CurrentInfo.MonthNames.ToList();
+            var monthlyExpenses = _expenseService.MonthlyExpense(year);
 
-            try
+            var monthNames = CultureInfo.InvariantCulture.DateTimeFormat.MonthNames;
+
+            var result = new Dictionary<string, double>();
+            for (var month = 0; month < monthlyExpenses.Count; month++)
             {
-                expenses = _expenseService.MonthlyExpense(year);
-            }
-            catch (BadHttpRequestException e)
-            {
-                throw new BadHttpRequestException("Request handling failed!", e.StatusCode);
+                result[monthNames[month]] = monthlyExpenses[month];
             }
 
-            for (int i = 0; i < names.Count - 1; i++)
-            {
-                keyValuePairs.Add(names[i], expenses[i]);
-            }
-
-            return Ok(keyValuePairs);
-
-            //throw new NotImplementedException();
+            return Ok(result);
         }
 
-        // ------------------------------------------------------------------
-        // GET api/expenses/categories?year=2026
-        // The costs per category of the selected year.
-        // ------------------------------------------------------------------
+        /// <summary>
+        /// GET api/expenses/categories?year=2026
+        /// Expense of each category from the entered year.
+        /// </summary>
+        /// <param name="year"></param>
+        /// <returns></returns>
         [HttpGet("categories")]
-        [ProducesResponseType(StatusCodes.Status200OK)]
-        public ActionResult<IReadOnlyList<ExpenseDTO>> GetCategories([FromQuery] int? year)
+        [ProducesResponseType(typeof(IReadOnlyList<CategoryCostDTO>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
+        public ActionResult<IReadOnlyList<CategoryCostDTO>> GetCategories([FromQuery, Range(MinYear, MaxYear)] int? year)
         {
+            var categories = _expenseService.ExpenseByCategory(year)
+                .Select(c => new CategoryCostDTO(c.Category, c.Expense))
+                .ToList();
 
-            year ??= DateTime.Now.Year;
-
-            List<ExpenseDTO> expensesModels = new List<ExpenseDTO>();
-
-            try
-            {
-                expensesModels = _expenseService.ExpenseByCategory(year)
-                    .Select(s => new ExpenseDTO(s.Category, s.Expense)).ToList();
-
-            }
-            catch (BadHttpRequestException e)
-            {
-                throw new BadHttpRequestException($"Request handling failed!: {e.Message}", e.StatusCode);
-            }
-
-            if (expensesModels != null)
-                return Ok(expensesModels);
-            else
-                return BadRequest();
-
+            return Ok(categories);
         }
 
-        // ------------------------------------------------------------------
-        // POST api/expenses
-        // Adds a new entry. Body: JSON matching ExpenseRequest.
-        // ------------------------------------------------------------------
+
+        /// <summary>
+        /// GET api/expenses/42
+        /// Return one single entry.
+        /// </summary>
+        /// <param name="id"></param>
+        /// <returns></returns>
+        [HttpGet("{id:int}")]
+        [ProducesResponseType(typeof(ExpensesModel), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public ActionResult<ExpensesModel> GetById(int id)
+        {
+            var expense = _expenseService.GetById(id);
+
+            if (expense is null)
+            {
+                return NotFound();
+            }
+
+            return Ok(expense);
+        }
+
+        /// <summary>
+        /// POST api/expenses
+        /// add new entry. Content under Body. 
+        /// </summary>
+        /// <param name="request"></param>
+        /// <returns></returns>
         [HttpPost]
-        [ProducesResponseType(StatusCodes.Status201Created)]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        public Task<ActionResult<ExpensesModel>> Create([FromBody] ExpenseDTO request)
+        [ProducesResponseType(typeof(ExpensesModel), StatusCodes.Status201Created)]
+        [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
+        public ActionResult<ExpensesModel> Create([FromBody] ExpenseDTO request)
         {
-            // TODO: [ApiController] already answers 400 automatically when the annotations on
-            //       ExpenseRequest are violated; business rules (e.g. date in the future?) go in the service.
-            // TODO: the service creates the entity, saves it and returns it (with the new Id).
-            // TODO: answer 201 Created with the new entry. CreatedAtAction(...) also needs a
-            //       GET api/expenses/{id} endpoint for the Location header; if you don't want one,
-            //       use Created($"/api/expenses/{created.Id}", created) instead.
-            throw new NotImplementedException();
+            var created = _expenseService.AddExpense(request);
+
+            return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
         }
 
-        // ------------------------------------------------------------------
-        // PUT api/expenses/42
-        // Replaces all editable fields of entry 42. Body: JSON matching ExpenseRequest.
-        // (Use [HttpPatch] instead if callers should be able to send only the changed fields.)
-        // ------------------------------------------------------------------
+        /// <summary>
+        /// PUT api/expenses/{id}
+        /// Update selected entry. Content from body.
+        /// </summary>
+        /// <param name="id"></param>
+        /// <param name="request"></param>
+        /// <returns></returns>
         [HttpPut("{id:int}")]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
-        public Task<IActionResult> Update(int id, [FromBody] ExpenseDTO request)
+        public IActionResult Update(int id, [FromBody] ExpenseDTO request)
         {
-            // TODO: the service looks up entry `id` and updates it.
-            // TODO: unknown id -> return NotFound().
-            // TODO: success -> return NoContent().
-            throw new NotImplementedException();
+            var updated = _expenseService.UpdateExpense(id, request);
+
+            if (updated is null)
+            {
+                return NotFound();
+            }
+
+            return NoContent();
         }
     }
 }

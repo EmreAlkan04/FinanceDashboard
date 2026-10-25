@@ -31,13 +31,15 @@ namespace FinanceDashboard.Data
                 entity.Property(e => e.Note)
                       .HasMaxLength(NoteMaxLength);
 
-                // An expense belongs to a day, not to a point in time.
                 entity.Property(e => e.Date)
                       .HasColumnType("date");
 
-                // The dashboard filters by year/month and groups by category.
                 entity.HasIndex(e => e.Date);
                 entity.HasIndex(e => e.Category);
+
+                entity.Property(e => e.Image)
+                    .HasColumnType("varbinary(max)")
+                    .IsRequired(false);
             });
         }
     }

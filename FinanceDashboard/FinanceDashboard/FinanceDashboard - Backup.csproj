@@ -1,0 +1,22 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>ad68b9b9-d9fa-4340-aaba-c8776a72bd88</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\FinanceDashboard.Client\FinanceDashboard.Client.csproj" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" Version="8.0.8" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.31" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="8.0.31" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="8.0.31">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="serpapi" Version="1.0.0" />
+  </ItemGroup>
+
+</Project>

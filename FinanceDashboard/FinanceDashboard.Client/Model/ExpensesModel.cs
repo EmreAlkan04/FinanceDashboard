@@ -10,12 +10,13 @@
             Expense = expense;
         }
 
-        public ExpensesModel(string category, double expense, DateTime date, string? note)
+        public ExpensesModel(string category, double expense, DateTime date, string? note, byte[]? image = null)
         {
             Category = category;
             Expense = expense;
             Date = date;
             Note = note;
+            Image = image;
         }
 
         public int Id { get; set; }
@@ -23,5 +24,6 @@
         public double Expense { get; set; }
         public DateTime Date { get; set; }
         public string? Note { get; set; }
+        public byte[]? Image { get; set; }
     }
 }
