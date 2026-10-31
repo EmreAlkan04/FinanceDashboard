@@ -19,11 +19,11 @@ namespace FinanceDashboard.Data
         private readonly IConfiguration configuration;
         private readonly ImageSettings _imageSettings;
 
-        public ExpenseService(FinanceDbContext db, IConfiguration configuration, ImageSettings imageSettings)
+        public ExpenseService(FinanceDbContext db, IConfiguration configuration, IOptions<ImageSettings> imageSettings)
         {
             _db = db;
             this.configuration = configuration;
-            _imageSettings = imageSettings;
+            _imageSettings = imageSettings.Value;
         }
 
         public List<ExpensesModel> GetFirst(int count) =>
@@ -64,35 +64,42 @@ namespace FinanceDashboard.Data
             return totalExpense;
         }
 
-        public List<FinanceDashboard.Model.ExpensesModel> ExpenseByCategory(int? year = null)
+        public List<CategoryCostDTO> ExpenseByCategory(int? year = null)
         {
             year ??= DateTime.Now.Year;
 
-            HashSet<string> catNames = new HashSet<string>();
-            List<FinanceDashboard.Model.ExpensesModel> list = new List<FinanceDashboard.Model.ExpensesModel>();
+            //HashSet<string> catNames = new HashSet<string>();
+            //List<CategoryCostDTO> list = new List<CategoryCostDTO>();
 
-            foreach (var item in _db.Expenses.Where(s => s.Date.Year.Equals(year)))
-            {
-                // string cat = item.Split(",", 3)[1];
-                if (!catNames.Any(s => s.Equals(item.Category.ToString())))
-                    catNames.Add(item.Category);
-            }
+            return _db.Expenses
+                 .Where(s => s.Date.Year.Equals(year))
+                 .GroupBy(s => s.Category)
+                 .OrderByDescending(s => s.Sum(a => a.Expense))
+                 .Select(g => new CategoryCostDTO(g.Key, g.Sum(s => s.Expense)))
+                 .ToList();
 
-            foreach (var categoryItem in catNames)
-            {
-                double catExpense = 0;
-                var catEntries = _db.Expenses.Where(s => s.Category.Equals(categoryItem) && s.Date.Year.Equals(year)).ToList();
+            //foreach (var item in _db.Expenses.Where(s => s.Date.Year.Equals(year)))
+            //{
+            //    // string cat = item.Split(",", 3)[1];
+            //    if (!catNames.Any(s => s.Equals(item.Category.ToString())))
+            //        catNames.Add(item.Category);
+            //}
 
-                foreach (var item in catEntries)
-                    catExpense += item.Expense;
+            //foreach (var categoryItem in catNames)
+            //{
+            //    double catExpense = 0;
+            //    var catEntries = _db.Expenses.Where(s => s.Category.Equals(categoryItem) && s.Date.Year.Equals(year)).ToList();
 
-                catExpense = Math.Round(catExpense, 2);
-                list.Add(new Model.ExpensesModel(categoryItem, catExpense));
-            }
+            //    foreach (var item in catEntries)
+            //        catExpense += item.Expense;
 
-            list = list.OrderByDescending(s => s.Expense).ToList();
+            //    catExpense = Math.Round(catExpense, 2);
+            //    list.Add(new Model.ExpensesModel(categoryItem, catExpense));
+            //}
 
-            return list;
+            //list = list.OrderByDescending(s => s.Expense).ToList();
+
+            //return list;
         }
 
         public List<double> MonthlyExpense(int? year = null)
@@ -112,21 +119,25 @@ namespace FinanceDashboard.Data
             return montlyExpensesList;
         }
 
-        public List<FinanceDashboard.Model.ExpensesModel> PercentageChart()
+        public double PercentageConverter(string category, double expenseOfCategory, int? year = null)
         {
+            year ??= DateTime.Now.Year;
+            double total = TotalExpenseOfTheYear(year);
 
-            List<FinanceDashboard.Model.ExpensesModel> percentages = new List<FinanceDashboard.Model.ExpensesModel>();
-            var total = TotalExpenseOfTheYear();
+            double percent = (expenseOfCategory / total) * 100;
+            percent = Math.Round(percent, 2);
 
-            foreach (var item in ExpenseByCategory())
-            {
-                var irtgendwas = (item.Expense / total) * 100;
-                irtgendwas = Math.Round(irtgendwas, 2);
-                FinanceDashboard.Model.ExpensesModel model = new Model.ExpensesModel(item.Category, irtgendwas);
-                percentages.Add(model);
-            }
+            return percent;
 
-            return percentages;
+            //foreach (var item in ExpenseByCategory(year))
+            //{
+            //    var irtgendwas = (item.Expense / total) * 100;
+            //    irtgendwas = Math.Round(irtgendwas, 2);
+            //    FinanceDashboard.Model.ExpensesModel model = new Model.ExpensesModel(item.Category, irtgendwas);
+            //    percentages.Add(model);
+            //}
+
+            //return percentages;
         }
 
         public List<FinanceDashboard.Model.ExpensesModel> Ranking(double? minExp = 00.00, int? year = null)
@@ -214,7 +225,7 @@ namespace FinanceDashboard.Data
                 .Where(s => s.Expense >= _imageSettings.MinimumExpense
                             && s.Note != null
                             && s.Note != ""
-                            && s.Image == null 
+                            && s.Image == null
                             && allowedCategories.Contains(s.Category))
                 .ToListAsync(cancellationToken);
 

@@ -76,7 +76,7 @@ namespace FinanceDashboard.Controllers
         [HttpGet("{id:int}")]
         [ProducesResponseType(typeof(ExpensesModel), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
-        public ActionResult<ExpensesModel> GetById(int id)
+        public ActionResult<ExpenseDTO> GetById(int id)
         {
             var expense = _expenseService.GetById(id);
 
@@ -85,7 +85,15 @@ namespace FinanceDashboard.Controllers
                 return NotFound();
             }
 
-            return Ok(expense);
+            ExpenseDTO dto = new ExpenseDTO
+            {
+                Category = expense.Category,
+                Date = expense.Date,
+                Expense = expense.Expense,
+                Note = expense.Note
+            };
+
+            return Ok(dto);
         }
 
         /// <summary>

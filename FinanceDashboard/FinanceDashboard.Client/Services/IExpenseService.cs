@@ -17,9 +17,9 @@ namespace FinanceDashboard.Client.Services
 
         double TotalExpenseOfTheYear(int? year = null);
 
-        List<FinanceDashboard.Model.ExpensesModel> ExpenseByCategory(int? year = null);
+        List<CategoryCostDTO> ExpenseByCategory(int? year = null);
         List<double> MonthlyExpense(int? year = null);
-        List<FinanceDashboard.Model.ExpensesModel> PercentageChart();
+        double PercentageConverter(string category, double expenseOfCategory, int? year = null);
         List<FinanceDashboard.Model.ExpensesModel> Ranking(double? minExp = 00.00, int? year = null);
 
         /// <summary>

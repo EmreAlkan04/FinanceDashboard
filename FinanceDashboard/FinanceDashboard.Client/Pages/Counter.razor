@@ -1,10 +1,13 @@
 ﻿@page "/counter"
-@rendermode InteractiveServer
+@* @rendermode InteractiveServer *@
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
 @using System.Globalization
 @using FinanceDashboard.Client.Components
 @using FinanceDashboard.Client.Services
 @using FinanceDashboard.Model
 @using System.Net
+@* @using ApexCharts; *@
+@using MudBlazor;
 @inject IExpenseService ExpenseService
 
 <PageTitle>Counter</PageTitle>
@@ -87,6 +90,24 @@ else
                     }
                 </tbody>
             </table>
+
+            <div>
+                @* <ApexChart TItem="CategoryRow" Title="Expenses per Category" @ref="categoryChartBla">
+            <ApexPointSeries TItem="CategoryRow"
+            Items="categories"
+            Name="Categories"
+            SeriesType="SeriesType.Donut"
+            XValue="@(m => m.Category)"
+            YValue="@(m => (decimal)m.Percent)" />
+            </ApexChart> *@
+
+                <MudChart T="double" ChartType="ChartType.Donut" Width="100%" Height="300px" ChartSeries="@DataCategories.AsChartDataSet()" ChartLabels="@Labels">
+                    <CustomGraphics>
+                        <text class="mud-donut-text mud-typography-h3" x="50%" y="50%">@DataCategories.Sum()</text>
+                    </CustomGraphics>
+                </MudChart>
+            </div>
+
         </section>
 
         <section class="mb-5">
@@ -108,6 +129,10 @@ else
                     }
                 </tbody>
             </table>
+
+            <MudChart T="double" ChartType="ChartType.Bar" ChartSeries="@_series" ChartLabels="@_xAxisLabels"
+                      ChartOptions="@_options" Width="100%" Height="350px" />
+
         </section>
 
         <section class="mb-5">
@@ -155,7 +180,8 @@ else
                                     {
                                         <img src="@imageSrc"
                                              alt="@item.Note"
-                                             style="max-width: 100px; max-height: 100px; object-fit: contain;" />
+                                             style="max-width: 100px; max-height: 100px; object-fit: contain;"
+                                             loading="lazy" />
                                     }
                                     else
                                     {
@@ -183,6 +209,7 @@ else
 
     // One row of the category table. Total and share come from two separate service calls.
     private record CategoryRow(string Category, double Total, double Percent);
+    private record MonthlyChartDTO(string Month, double Expense);
 
     private bool isLoading = true;
     private string? errorMessage;
@@ -202,6 +229,18 @@ else
     private double minRankingExpense;
     private List<ExpensesModel> ranking = new();
 
+    // private List<MonthlyChartDTO> monthlyChart = new();
+    // private ApexChart<MonthlyChartDTO>? monthlyChartBla;
+
+    // private ApexChart<CategoryRow> categoryChartBla;
+
+    private readonly BarChartOptions _options = new() { ShowValues = true };
+
+    //Mudblazor components
+    private List<ChartSeries<double>> _series = new(); /* { Name = "United States", Data = new double[] { 40, 20, 25, 27, 46 } } */
+    private string[] _xAxisLabels;
+    private static double[] DataCategories; /* [25, 77, 28, 5]; */
+    private static string[] Labels; /* ["Oil", "Coal", "Gas", "Biomass"]; */
 
     protected override async Task OnInitializedAsync()
     {
@@ -216,8 +255,9 @@ else
             LoadTotalCost();
             LoadCategories();
             LoadMonthlyExpenses();
-            await LoadMissingImages();
+            // await LoadMissingImages();
             LoadRanking(); // last: if it fails, the rest of the page is already filled
+
         }
         catch (Exception ex)
         {
@@ -235,15 +275,48 @@ else
     private void LoadCategories()
     {
         // PercentageChart() returns the share in the Expense property; it is given a proper name here.
-        var shares = ExpenseService.PercentageChart().ToDictionary(item => item.Category, item => item.Expense);
+        @* var shares = ExpenseService.PercentageChart().ToDictionary(item => item.Category, item => item.Expense); *@
 
-        categories = ExpenseService.ExpenseByCategory(universalYear)
-            .Select(item => new CategoryRow(item.Category, item.Expense, shares.GetValueOrDefault(item.Category)))
+        // var blal = ExpenseService.ExpenseByCategory(universalYear);
+        categories.Clear();
+        foreach (var item in ExpenseService.ExpenseByCategory(universalYear))
+        {
+            var percent = totalCost > 0 ? item.Expense / totalCost * 100 : 0;
+            categories.Add(new CategoryRow(item.Category, item.Expense, Math.Round(percent, 2)));
+        }
+        @*         categories = ExpenseService.ExpenseByCategory(universalYear)
+        .Select(item => new CategoryRow(item.Category, item.Expense, )
             .ToList();
+ *@
+        DataCategories = categories.Select(s => s.Total).ToArray();
+        Labels = categories.Select(s => s.Category).ToArray();
     }
 
-    private void LoadMonthlyExpenses() =>
+    private void LoadMonthlyExpenses()
+    {
         monthlyExpenses = ExpenseService.MonthlyExpense(universalYear);
+
+        _xAxisLabels = CultureInfo.CurrentCulture.DateTimeFormat.MonthNames;
+        _series.Clear();
+        _series.Add(new()
+            {
+                Name = $"Expenses for the year {universalYear}",
+                Data = monthlyExpenses.ToArray()
+            });
+
+        // _series.Data = monthlyExpenses.ToArray();
+        // _series.Name = $"Expenses for the Year {universalYear}";
+
+
+        // for (int month = 1; month <= CultureInfo.CurrentCulture.DateTimeFormat.)
+        @*         monthlyChart.Clear();
+        for (int i = 1; i <= monthlyExpenses.Count; i++)
+        {
+            string monthName = MonthName(i);
+            double expense = monthlyExpenses[i - 1];
+            monthlyChart.Add(new MonthlyChartDTO(monthName, expense));
+        }
+ *@     }
 
     private async Task LoadMissingImages() => await ExpenseService.ImageReceiverAsync();
 
@@ -256,14 +329,25 @@ else
         Reload(LoadTotalCost);
     }
 
-    private void SelectUniversalYear(int year)
+    private async Task SelectUniversalYear(int year)
     {
         universalYear = year;
         Reload(LoadTotalCost);
         Reload(LoadCategories);
         Reload(LoadMonthlyExpenses);
         Reload(LoadRanking);
+
+        @* await UpdateApexChart(); *@
     }
+
+    @*     private async Task UpdateApexChart()
+    {
+        if (monthlyChart is not null)
+            await monthlyChartBla.UpdateSeriesAsync(animate: true);
+
+        if (categories is not null)
+            await categoryChartBla.UpdateSeriesAsync(animate: true);
+    } *@
 
     private void ShowRanking()
     {
