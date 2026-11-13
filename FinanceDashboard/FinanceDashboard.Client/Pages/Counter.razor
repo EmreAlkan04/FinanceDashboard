@@ -1,96 +1,351 @@
 ﻿@page "/counter"
-@rendermode InteractiveWebAssembly
+@* @rendermode InteractiveServer *@
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@using System.Globalization
+@using FinanceDashboard.Client.Components
+@using FinanceDashboard.Client.Services
+@using FinanceDashboard.Model
+@using System.Net
+@* @using ApexCharts; *@
+@using MudBlazor;
+@using static MudBlazor.CategoryTypes
+@inject IExpenseService ExpenseService
 
-<PageTitle>Counter</PageTitle>
+<PageTitle>Expenses</PageTitle>
+<MudPopoverProvider />
 
-<h1>Counter</h1>
+<h1>Expenses for @universalYear</h1>
 
-<p role="status">
+@if (errorMessage is not null)
+{
+    <div class="alert alert-danger" role="alert">@errorMessage</div>
+}
 
-    Total cost is: @TotalCost()
-    <br>
+@if (isLoading)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
 
-    Categories:
+        @* Year buttons *@
+            <YearSelector Years="availableYears" SelectedYear="universalYear" OnSelected="SelectUniversalYear" />
 
-    @foreach (var category in ChartByeCategory())
-    {
-        <div>
-            <strong>@category.CategoryName: @category.Expense €</strong>
-        </div>
-    }
+        @* Categories table *@
+            <h3>Categories for @(_monthNames.GetValue(selectedMonth).ToString() ?? "") @universalYear</h3>
+            <MudTable Items="@categories"
+                      Dense="true"
+                      Striped="true"
+                      Hover="true"
+                      Elevation="0">
 
-    @*     Current count:
-    @foreach (var item in listRows)
-    {
-    <div>
-    @item
-    </div>
+                <HeaderContent>
+                    <MudTh>Category</MudTh>
+                    <MudTh Align="Align.Right">Total</MudTh>
+                    <MudTh Align="Align.Right">Share</MudTh>
+                </HeaderContent>
 
-    } *@
-</p>
+                <RowTemplate>
+                    <MudTd DataLabel="Category">@context.Category</MudTd>
+                    <MudTd DataLabel="Total" Align="Align.Right">@Money(context.Total)</MudTd>
+                    <MudTd DataLabel="Share" Align="Align.Right">@Percent(context.Percent)</MudTd>
+                </RowTemplate>
 
-@* <button class="btn btn-primary" @onclick="IncrementCount">Click me</button> *@
+                <FooterContent>
+                    <MudTd><strong>Total</strong></MudTd>
+                    <MudTd Align="Align.Right"><strong>@Money(categories.Sum(x => x.Total))</strong></MudTd>
+                    <MudTd Align="Align.Right"><strong>@Percent(categories.Sum(x => x.Percent))</strong>                    </MudTd>
+                </FooterContent>
+            </MudTable>
 
-@code {
-    private List<string> listRows = new List<string>();
+        @* Donut chart *@
+            <MudChart T="double" ChartType="ChartType.Donut" Width="100%" Height="300px" ChartSeries="@DataCategories.AsChartDataSet()" ChartLabels="@LabelCategories">
+                <CustomGraphics>
+                    <text class="mud-donut-text mud-typography-h3" x="50%" y="50%">@Money(DataCategories.Sum())</text>
+                </CustomGraphics>
+            </MudChart>
 
-    protected override void OnInitialized()
-    {
-        var reader = new StreamReader(File.OpenRead(@"C:\\GitHub\\FinanceDashboard\\FinanceDashboard\\FinanceDashboard\\wwwroot\\expenses.csv"));
-        while (!reader.EndOfStream)
-        {
-            listRows.Add(reader.ReadLine());
-        }
-    }
-
-    private double TotalCost()
-    {
-        double totalExpense = 0;
-        foreach (var item in listRows.Skip(1))
-        {
-            var testname = item.Split(",", 4);
-
-            double expense = Convert.ToDouble(testname.GetValue(2).ToString().Replace(".", ","));
-            // Int32.TryParse(testname.GetValue(2).ToString(), out expense);
-            totalExpense += expense;
-        }
-
-        totalExpense = Math.Round(totalExpense, 2);
-
-        return totalExpense;
-    }
-
-    private List<FinanceDashboard.Model.CategoryModel> ChartByeCategory()
-    {
-        HashSet<string> catNames = new HashSet<string>();
-        List<FinanceDashboard.Model.CategoryModel> test = new List<FinanceDashboard.Model.CategoryModel>();
-
-        foreach (var item in listRows.Skip(1))
-        {
-            string cat = item.Split(",", 3)[1];
-            catNames.Add(cat);
-        }
-
-        foreach (var categoryItem in catNames)
-        {
-            double catExpense = 0;
-            List<string> catEntries = listRows.Where(s => s.Contains(categoryItem)).ToList();
-
-            foreach (var item in catEntries)
+            @foreach (var item in _monthNames.Select((value, i) => new { i, value }).Where(s => !string.IsNullOrWhiteSpace(s.value)))
             {
-                var testname = item.Split(",", 4);
-
-                double expense = Convert.ToDouble(testname.GetValue(2).ToString().Replace(".", ","));
-                // Int32.TryParse(testname.GetValue(2).ToString(), out expense);
-                catExpense += expense;
+                <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="@(() => SelectedMonth(item.i))">@item.value</MudButton>
             }
 
-            catExpense = Math.Round(catExpense, 2);
-            test.Add(new Model.CategoryModel(categoryItem, catExpense));
+        @* Monthly expenses table *@
+        <h3>Monthly expenses</h3>
+        <MudTable Items="monthlyExpenses.Select((expense, index) => new { Month = index + 1, Expense = expense })"
+                  Dense="true" Striped="true" Hover="true" Bordered="false" Elevation="0">
+
+            <HeaderContent>
+                <MudTh>Month</MudTh>
+                <MudTh Align="Align.Right">Expenses</MudTh>
+            </HeaderContent>
+
+            <RowTemplate>
+                <MudTd DataLabel="Month">@MonthName(context.Month)</MudTd>
+                <MudTd DataLabel="Expenses" Align="Align.Right">@Money(context.Expense)</MudTd>
+            </RowTemplate>
+
+            <FooterContent>
+                <MudTd><strong>Total</strong></MudTd>
+                <MudTd Align="Align.Right"><strong>@Money(totalExpense)</strong></MudTd>
+            </FooterContent>
+        </MudTable>
+
+        @* Bar chart *@
+        <MudChart T="double" ChartType="ChartType.Bar" ChartSeries="@_seriesMonthlyExpense" ChartLabels="@_monthNames"
+                  ChartOptions="@_options"
+                  Width="100%"
+                  Height="350px" />
+
+
+        @* Table with filte sort*@
+        <MudTable Items="@allEntires" Filter="new Func<ExpensesModel,bool>(FilterFunc1)" Hover="true" RowsPerPage="10" SortLabel="Sort By" Breakpoint="Breakpoint.Sm" LoadingProgressColor="Color.Info">
+            <ToolBarContent>
+                <MudText Typo="Typo.h6">Expenses Table</MudText>
+                <MudSpacer />
+                <MudTextField @bind-Value="searchString"
+                              Placeholder="Search..."
+                              Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Filled.Search"
+                              IconSize="Size.Medium"
+                              Class="mt-0" />
+            </ToolBarContent>
+            <HeaderContent>
+                <MudTh><MudTableSortLabel SortBy="new Func<ExpensesModel, object>(x=>x.Id)">Id</MudTableSortLabel></MudTh>
+                <MudTh><MudTableSortLabel InitialDirection="SortDirection.Ascending" SortBy="new Func<ExpensesModel, object>(x=>x.Category)">Category</MudTableSortLabel></MudTh>
+                <MudTh><MudTableSortLabel SortBy="new Func<ExpensesModel, object>(x=>x.Expense)">Expense</MudTableSortLabel></MudTh>
+                <MudTh><MudTableSortLabel SortBy="new Func<ExpensesModel, object>(x=>x.Date)">Date</MudTableSortLabel></MudTh>
+                <MudTh>Note</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Id">@context.Id</MudTd>
+                <MudTd DataLabel="Category">@context.Category</MudTd>
+                <MudTd DataLabel="Expense">@Money(context.Expense)</MudTd>
+                <MudTd DataLabel="Date">@context.Date.ToString("dd.MM.yyyy")</MudTd>
+                <MudTd DataLabel="Note">@context.Note</MudTd>
+            </RowTemplate>
+            <PagerContent>
+                <MudTablePager PageSizeOptions="new int[] { 5, 10, 25, 50, 100 }" />
+            </PagerContent>
+        </MudTable>
+}
+
+@code {
+    private const int FirstEntriesCount = 30;
+    private int RankingRowsShown = 10;
+
+    // One row of the category table. Total and share come from two separate service calls.
+    private record CategoryRow(string Category, double Total, double Percent);
+    private record MonthlyChartDTO(string Month, double Expense);
+
+    private bool isLoading = true;
+    private string? errorMessage;
+
+    private List<ExpensesModel> allEntires = new();
+    private int totalEntries;
+
+    private List<int> availableYears = new();
+
+    private int universalYear;
+    private double totalExpense;
+
+    private List<CategoryRow> categories = new();
+
+    private List<double> monthlyExpenses = new();
+
+    private double minRankingExpense;
+    private List<ExpensesModel> ranking = new();
+
+    // private List<MonthlyChartDTO> monthlyChart = new();
+    // private ApexChart<MonthlyChartDTO>? monthlyChartBla;
+
+    // private ApexChart<CategoryRow> categoryChartBla;
+
+    private readonly BarChartOptions _options = new() { ShowValues = true };
+
+    //Mudblazor components
+    private List<ChartSeries<double>> _seriesMonthlyExpense = new(); /* { Name = "United States", Data = new double[] { 40, 20, 25, 27, 46 } } */
+    private static string[] _monthNames = CultureInfo.CurrentCulture.DateTimeFormat.MonthNames.ToArray();
+    private static double[] DataCategories; /* [25, 77, 28, 5]; */
+    private static string[] LabelCategories; /* ["Oil", "Coal", "Gas", "Biomass"]; */
+    private int selectedMonth = 12;
+    private string searchString = "";
+    // private bool enabledSorting = true;
+
+
+    // [Parameter]
+    // public EventCallback<string> OnSelected { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            allEntires = ExpenseService.GetAllEntriesForTable();
+            totalEntries = ExpenseService.GetCount();
+            availableYears = (await ExpenseService.GetAllYears()).OrderByDescending(year => year).ToList();
+
+            universalYear = PickInitialYear();
+
+            LoadTotalCost();
+            LoadCategories();
+            LoadMonthlyExpenses();
+            // await LoadMissingImages();
+            LoadRanking(); // last: if it fails, the rest of the page is already filled
+
+        }
+        catch (Exception ex)
+        {
+            ReportError(ex);
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void LoadTotalCost() =>
+        totalExpense = ExpenseService.TotalExpenseOfTheYear(universalYear);
+
+    private void LoadCategories()
+    {
+        // PercentageChart() returns the share in the Expense property; it is given a proper name here.
+        @* var shares = ExpenseService.PercentageChart().ToDictionary(item => item.Category, item => item.Expense); *@
+
+        // var blal = ExpenseService.ExpenseByCategory(universalYear);
+        categories.Clear();
+        selectedMonth = 12;
+        foreach (var item in ExpenseService.ExpenseByCategory(universalYear))
+        {
+            var percent = totalExpense > 0 ? item.Expense / totalExpense * 100 : 0;
+            categories.Add(new CategoryRow(item.Category, Math.Round(item.Expense, 2), Math.Round(percent, 2)));
+        }
+        @*         categories = ExpenseService.ExpenseByCategory(universalYear)
+        .Select(item => new CategoryRow(item.Category, item.Expense, )
+            .ToList();
+ *@
+        DataCategories = categories.Select(s => s.Total).ToArray();
+        LabelCategories = categories.Select(s => s.Category).ToArray();
+    }
+
+    private void LoadCategoriesByMonth()
+    {
+        categories.Clear();
+        var expensesByCategory = ExpenseService.ExpenseByCategory(universalYear, selectedMonth);
+        var totalCost = expensesByCategory.Select(s => s.Expense).Sum();
+
+        foreach (var item in expensesByCategory)
+        {
+            // var percent = totalCost > 0 ? item.Expense / totalCost * 100 : 0;
+            var percent = (item.Expense / totalCost) * 100;
+            categories.Add(new CategoryRow(item.Category, Math.Round(item.Expense, 2), Math.Round(percent, 2)));
         }
 
-        test = test.OrderByDescending(s => s.Expense).ToList();
+        DataCategories = categories.Select(s => s.Total).ToArray();
+        LabelCategories = categories.Select(s => s.Category).ToArray();
 
-        return test;
+        StateHasChanged();
     }
+
+    private void LoadMonthlyExpenses()
+    {
+        monthlyExpenses = ExpenseService.MonthlyExpense(universalYear);
+
+        _seriesMonthlyExpense.Clear();
+        _seriesMonthlyExpense.Add(new()
+            {
+                Name = $"Expenses for the year {universalYear}",
+                Data = monthlyExpenses.ToArray()
+            });
+
+        // _series.Data = monthlyExpenses.ToArray();
+        // _series.Name = $"Expenses for the Year {universalYear}";
+
+
+        // for (int month = 1; month <= CultureInfo.CurrentCulture.DateTimeFormat.)
+        @*         monthlyChart.Clear();
+        for (int i = 1; i <= monthlyExpenses.Count; i++)
+        {
+            string monthName = MonthName(i);
+            double expense = monthlyExpenses[i - 1];
+            monthlyChart.Add(new MonthlyChartDTO(monthName, expense));
+        }
+ *@     }
+
+    // private async Task LoadMissingImages() => await ExpenseService.ImageReceiverAsync();
+
+    private void LoadRanking() =>
+        ranking = ExpenseService.Ranking(minRankingExpense, universalYear);
+
+    private void SelectTotalCostYear(int year)
+    {
+        universalYear = year;
+        Reload(LoadTotalCost);
+    }
+
+    private async Task SelectUniversalYear(int year)
+    {
+        universalYear = year;
+        Reload(LoadTotalCost);
+        Reload(LoadCategories);
+        Reload(LoadMonthlyExpenses);
+        Reload(LoadRanking);
+
+        @* await UpdateApexChart(); *@
+    }
+
+    private void SelectedMonth(int monthIndex)
+    {
+        selectedMonth = monthIndex;
+        LoadCategoriesByMonth();
+    }
+
+    private void ShowRanking()
+    {
+        RankingRowsShown = 10;
+        Reload(LoadRanking);
+    }
+    private void ShowMoreFromRanking() => RankingRowsShown += 10;
+
+    private void Reload(Action loader)
+    {
+        try
+        {
+            errorMessage = null;
+            loader();
+        }
+        catch (Exception ex)
+        {
+            ReportError(ex);
+        }
+    }
+
+    private bool FilterFunc1(ExpensesModel element) => FilterFunc(element, searchString);
+
+    private bool FilterFunc(ExpensesModel element, string searchString)
+    {
+        if (string.IsNullOrWhiteSpace(searchString))
+            return true;
+        // if (element.Note.Contains(searchString, StringComparison.OrdinalIgnoreCase))
+        //     return true;
+        // if (element.Name.Contains(searchString, StringComparison.OrdinalIgnoreCase))
+        //     return true;
+        // if ($"{element.Number} {element.Position} {element.Molar}".Contains(searchString))
+        //     return true;
+        return element.Note?.Contains(searchString, StringComparison.OrdinalIgnoreCase) ?? false;
+    }
+    private void ReportError(Exception ex) =>
+        errorMessage = $"Could not load data from the database: {ex.Message}";
+
+    private int PickInitialYear() =>
+        availableYears.Count == 0 || availableYears.Contains(DateTime.Now.Year)
+            ? DateTime.Now.Year
+            : availableYears[0];
+
+
+    private static string Money(double value) => $"{value:N2} €";
+
+    private static string Percent(double value) => double.IsFinite(value) ? $"{value:N2} %" : "–";
+
+    private static string MonthName(int month) =>
+        CultureInfo.CurrentCulture.DateTimeFormat.GetMonthName(month);
 }

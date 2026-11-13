@@ -1,0 +1,22 @@
+﻿@* Row of year buttons. Presentation only: it reports the clicked year and knows nothing about the data. *@
+
+<div class="mb-3">
+    @foreach (var year in Years)
+    {
+        <MudBlazor.MudButton Variant="MudBlazor.Variant.Outlined" Color="MudBlazor.Color.Primary"
+                             @onclick="() => OnSelected.InvokeAsync(year)">
+            @year
+        </MudBlazor.MudButton>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public IReadOnlyList<int> Years { get; set; } = Array.Empty<int>();
+
+    [Parameter]
+    public int SelectedYear { get; set; }
+
+    [Parameter]
+    public EventCallback<int> OnSelected { get; set; }
+}

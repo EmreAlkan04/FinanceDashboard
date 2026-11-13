@@ -1,13 +1,72 @@
+using FinanceDashboard;
 using FinanceDashboard.Client.Pages;
+using FinanceDashboard.Client.Services;
 using FinanceDashboard.Components;
+using FinanceDashboard.Data;
+using Microsoft.EntityFrameworkCore;
+using MudBlazor.Services;
+
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddRazorComponents()
-    .AddInteractiveWebAssemblyComponents();
+    .AddInteractiveServerComponents();
+
+builder.Services.AddScoped<IExpenseService, ExpenseService>();
+builder.Services.AddControllers();
+
+//builder.Services.Configure<ImageSettings>(
+//    builder.Configuration.GetSection("ImageSettings"));
+
+builder.Services.AddDbContext<FinanceDbContext>(options =>
+{
+    options.UseSqlServer(builder.Configuration.GetConnectionString("FinanceDbContext"));
+});
+
+builder.Services.AddMudServices();
 
 var app = builder.Build();
+
+using (var scope = app.Services.CreateScope())
+{
+    var dbContext = scope.ServiceProvider.GetRequiredService<FinanceDbContext>();
+
+    if (app.Environment.IsDevelopment())
+    {
+        // Create the database + tables if they don't exist yet.
+        // Once you add EF migrations (dotnet ef migrations add InitialCreate)
+        // this switches to Migrate() automatically.
+        if (dbContext.Database.GetMigrations().Any())
+        {
+            await dbContext.Database.MigrateAsync();
+        }
+        else
+        {
+            await dbContext.Database.EnsureCreatedAsync();
+        }
+
+        // One-time import of wwwroot/expenses.csv. Does nothing once the table has rows.
+        var csvPath = Path.Combine(app.Environment.WebRootPath, "expenses.csv");
+        var imported = await FinanceDbSeeder.SeedFromCsvAsync(dbContext, csvPath, app.Logger);
+        var total = await dbContext.Expenses.CountAsync();
+
+        if (imported == 0 && total > 0)
+        {
+            app.Logger.LogInformation(
+                "Expenses table already contains {Total} rows, CSV import skipped.", total);
+        }
+        else
+        {
+            app.Logger.LogInformation(
+                "Database ready: {Imported} expenses imported from CSV, {Total} in total.", imported, total);
+        }
+    }
+    else if (!await dbContext.Database.CanConnectAsync())
+    {
+        throw new InvalidOperationException("Cannot connect to the FinanceDbContext database.");
+    }
+}
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
@@ -25,9 +84,10 @@ app.UseHttpsRedirection();
 
 app.UseStaticFiles();
 app.UseAntiforgery();
+app.MapControllers();
 
 app.MapRazorComponents<App>()
-    .AddInteractiveWebAssemblyRenderMode()
+    .AddInteractiveServerRenderMode()
     .AddAdditionalAssemblies(typeof(FinanceDashboard.Client._Imports).Assembly);
 
 app.Run();
