@@ -271,7 +271,7 @@ else
         }
  *@     }
 
-    private async Task LoadMissingImages() => await ExpenseService.ImageReceiverAsync();
+    // private async Task LoadMissingImages() => await ExpenseService.ImageReceiverAsync();
 
     private void LoadRanking() =>
         ranking = ExpenseService.Ranking(minRankingExpense, universalYear);

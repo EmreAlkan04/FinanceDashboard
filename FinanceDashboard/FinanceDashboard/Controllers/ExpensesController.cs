@@ -1,5 +1,6 @@
 ﻿using System.ComponentModel.DataAnnotations;
 using System.Globalization;
+using FinanceDashboard.Client.DTO;
 using FinanceDashboard.Client.Services;
 using FinanceDashboard.Model;
 using Microsoft.AspNetCore.Mvc;
@@ -105,9 +106,18 @@ namespace FinanceDashboard.Controllers
         [HttpPost]
         [ProducesResponseType(typeof(ExpensesModel), StatusCodes.Status201Created)]
         [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
-        public ActionResult<ExpensesModel> Create([FromBody] ExpenseDTO request)
+        public ActionResult<ExpensesModel> Create([FromBody] NewExpenseDTO request)
         {
-            var created = _expenseService.AddExpense(request);
+            ExpenseDTO expenseDTO = new ExpenseDTO
+            {
+                Category = request.Category,
+                Date = DateTime.Now,
+                Expense = request.Expense,
+                Note = request.Note,
+                //Image = null
+            }; 
+
+            var created = _expenseService.AddExpense(expenseDTO);
 
             return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
         }

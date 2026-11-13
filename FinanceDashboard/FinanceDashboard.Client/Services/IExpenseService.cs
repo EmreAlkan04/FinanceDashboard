@@ -1,4 +1,5 @@
-﻿using FinanceDashboard.Model;
+﻿using FinanceDashboard.Client.DTO;
+using FinanceDashboard.Model;
 
 namespace FinanceDashboard.Client.Services
 {
@@ -32,6 +33,6 @@ namespace FinanceDashboard.Client.Services
         ExpensesModel? GetById(int id);
         ExpensesModel AddExpense(ExpenseDTO expenseDTO);
         ExpensesModel? UpdateExpense(int id, ExpenseDTO expenseDTO);
-        Task<int> ImageReceiverAsync(CancellationToken cancellationToken = default);
+        //Task<int> ImageReceiverAsync(CancellationToken cancellationToken = default);
     }
 }

@@ -16,8 +16,8 @@ builder.Services.AddRazorComponents()
 builder.Services.AddScoped<IExpenseService, ExpenseService>();
 builder.Services.AddControllers();
 
-builder.Services.Configure<ImageSettings>(
-    builder.Configuration.GetSection("ImageSettings"));
+//builder.Services.Configure<ImageSettings>(
+//    builder.Configuration.GetSection("ImageSettings"));
 
 builder.Services.AddDbContext<FinanceDbContext>(options =>
 {

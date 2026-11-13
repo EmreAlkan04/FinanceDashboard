@@ -37,9 +37,9 @@ namespace FinanceDashboard.Data
                 entity.HasIndex(e => e.Date);
                 entity.HasIndex(e => e.Category);
 
-                entity.Property(e => e.Image)
-                    .HasColumnType("varbinary(max)")
-                    .IsRequired(false);
+                //entity.Property(e => e.Image)
+                //    .HasColumnType("varbinary(max)")
+                //    .IsRequired(false);
             });
         }
     }

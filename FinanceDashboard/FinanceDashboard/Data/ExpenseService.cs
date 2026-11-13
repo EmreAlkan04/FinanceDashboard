@@ -10,6 +10,7 @@ using System.Web;
 using System.Security.Policy;
 using System.Text.Json;
 using Microsoft.Extensions.Options;
+using FinanceDashboard.Client.DTO;
 
 namespace FinanceDashboard.Data
 {
@@ -17,13 +18,13 @@ namespace FinanceDashboard.Data
     {
         private readonly FinanceDbContext _db;
         private readonly IConfiguration configuration;
-        private readonly ImageSettings _imageSettings;
+        //private readonly ImageSettings _imageSettings;
 
-        public ExpenseService(FinanceDbContext db, IConfiguration configuration, IOptions<ImageSettings> imageSettings)
+        public ExpenseService(FinanceDbContext db, IConfiguration configuration/*, IOptions<ImageSettings> imageSettings*/)
         {
             _db = db;
             this.configuration = configuration;
-            _imageSettings = imageSettings.Value;
+            //_imageSettings = imageSettings.Value;
         }
 
         public List<ExpensesModel> GetAllEntriesForTable()
@@ -216,120 +217,120 @@ namespace FinanceDashboard.Data
                 : trimmed;
         }
 
-        public async Task<int> ImageReceiverAsync(
-            CancellationToken cancellationToken = default)
-        {
-            var apiKey = configuration["SerpApi:ApiKey"];
+        //public async Task<int> ImageReceiverAsync(
+        //    CancellationToken cancellationToken = default)
+        //{
+        //    var apiKey = configuration["SerpApi:ApiKey"];
 
-            if (string.IsNullOrWhiteSpace(apiKey))
-                throw new InvalidOperationException("SerpApi API key is missing.");
+        //    if (string.IsNullOrWhiteSpace(apiKey))
+        //        throw new InvalidOperationException("SerpApi API key is missing.");
 
-            var allowedCategories = _imageSettings.AllowedCategories;
+        //    var allowedCategories = _imageSettings.AllowedCategories;
 
-            var entriesWithoutImage = await _db.Expenses
-                .Where(s => s.Expense >= _imageSettings.MinimumExpense
-                            && s.Note != null
-                            && s.Note != ""
-                            && s.Image == null
-                            && allowedCategories.Contains(s.Category))
-                .ToListAsync(cancellationToken);
+        //    var entriesWithoutImage = await _db.Expenses
+        //        .Where(s => s.Expense >= _imageSettings.MinimumExpense
+        //                    && s.Note != null
+        //                    && s.Note != ""
+        //                    //&& s.Image == null
+        //                    && allowedCategories.Contains(s.Category))
+        //        .ToListAsync(cancellationToken);
 
-            if (entriesWithoutImage.Count == 0)
-                return 0;
+        //    if (entriesWithoutImage.Count == 0)
+        //        return 0;
 
-            using var client = new SerpApiClient(apiKey);
-            using var httpClient = new HttpClient
-            {
-                Timeout = TimeSpan.FromSeconds(20)
-            };
+        //    using var client = new SerpApiClient(apiKey);
+        //    using var httpClient = new HttpClient
+        //    {
+        //        Timeout = TimeSpan.FromSeconds(20)
+        //    };
 
-            int updatedCount = 0;
+        //    int updatedCount = 0;
 
-            foreach (var item in entriesWithoutImage)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
+        //    foreach (var item in entriesWithoutImage)
+        //    {
+        //        cancellationToken.ThrowIfCancellationRequested();
 
-                try
-                {
-                    var parameters = new Dictionary<string, string>
-                    {
-                        ["engine"] = "google_images",
-                        ["q"] = item.Note!,
-                        ["location"] = "Wien-Flughafen, Lower Austria, Austria",
-                        ["google_domain"] = "google.at",
-                        ["hl"] = "de",
-                        ["gl"] = "at"
-                    };
+        //        try
+        //        {
+        //            var parameters = new Dictionary<string, string>
+        //            {
+        //                ["engine"] = "google_images",
+        //                ["q"] = item.Note!,
+        //                ["location"] = "Wien-Flughafen, Lower Austria, Austria",
+        //                ["google_domain"] = "google.at",
+        //                ["hl"] = "de",
+        //                ["gl"] = "at"
+        //            };
 
-                    using var results = await client.SearchAsync(parameters);
+        //            using var results = await client.SearchAsync(parameters);
 
-                    if (!TryGetImageUrl(results.Root, out string? imageUrl))
-                        continue;
+        //            if (!TryGetImageUrl(results.Root, out string? imageUrl))
+        //                continue;
 
-                    byte[] imageBytes = await httpClient.GetByteArrayAsync(
-                        imageUrl,
-                        cancellationToken);
+        //            byte[] imageBytes = await httpClient.GetByteArrayAsync(
+        //                imageUrl,
+        //                cancellationToken);
 
-                    if (imageBytes.Length == 0)
-                        continue;
+        //            if (imageBytes.Length == 0)
+        //                continue;
 
-                    // The entity is already tracked by EF Core.
-                    item.Image = imageBytes;
-                    updatedCount++;
-                }
-                catch (OperationCanceledException)
-                    when (cancellationToken.IsCancellationRequested)
-                {
-                    throw;
-                }
-                catch (Exception ex)
-                {
-                    // A failed request should not stop processing other expenses.
-                    Console.WriteLine(
-                        $"Could not retrieve image for expense {item.Id}: {ex.Message}");
-                }
-            }
+        //            // The entity is already tracked by EF Core.
+        //            //item.Image = imageBytes;
+        //            updatedCount++;
+        //        }
+        //        catch (OperationCanceledException)
+        //            when (cancellationToken.IsCancellationRequested)
+        //        {
+        //            throw;
+        //        }
+        //        catch (Exception ex)
+        //        {
+        //            // A failed request should not stop processing other expenses.
+        //            Console.WriteLine(
+        //                $"Could not retrieve image for expense {item.Id}: {ex.Message}");
+        //        }
+        //    }
 
-            if (updatedCount > 0)
-                await _db.SaveChangesAsync(cancellationToken);
+        //    if (updatedCount > 0)
+        //        await _db.SaveChangesAsync(cancellationToken);
 
-            return updatedCount;
-        }
+        //    return updatedCount;
+        //}
 
-        private static bool TryGetImageUrl(
-            JsonElement root,
-            out string? imageUrl)
-        {
-            imageUrl = null;
+        //private static bool TryGetImageUrl(
+        //    JsonElement root,
+        //    out string? imageUrl)
+        //{
+        //    imageUrl = null;
 
-            if (!root.TryGetProperty("images_results", out var images)
-                || images.ValueKind != JsonValueKind.Array
-                || images.GetArrayLength() == 0)
-            {
-                return false;
-            }
+        //    if (!root.TryGetProperty("images_results", out var images)
+        //        || images.ValueKind != JsonValueKind.Array
+        //        || images.GetArrayLength() == 0)
+        //    {
+        //        return false;
+        //    }
 
-            var firstImage = images[0];
+        //    var firstImage = images[0];
 
-            if (!firstImage.TryGetProperty("original", out var original)
-                || original.ValueKind != JsonValueKind.String)
-            {
-                return false;
-            }
+        //    if (!firstImage.TryGetProperty("original", out var original)
+        //        || original.ValueKind != JsonValueKind.String)
+        //    {
+        //        return false;
+        //    }
 
-            var candidate = original.GetString();
+        //    var candidate = original.GetString();
 
-            if (!Uri.TryCreate(candidate, UriKind.Absolute, out var uri))
-                return false;
+        //    if (!Uri.TryCreate(candidate, UriKind.Absolute, out var uri))
+        //        return false;
 
-            if (uri.Scheme != Uri.UriSchemeHttps
-                && uri.Scheme != Uri.UriSchemeHttp)
-            {
-                return false;
-            }
+        //    if (uri.Scheme != Uri.UriSchemeHttps
+        //        && uri.Scheme != Uri.UriSchemeHttp)
+        //    {
+        //        return false;
+        //    }
 
-            imageUrl = uri.AbsoluteUri;
-            return true;
-        }
+        //    imageUrl = uri.AbsoluteUri;
+        //    return true;
+        //}
     }
 }

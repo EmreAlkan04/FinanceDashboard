@@ -16,7 +16,6 @@
             Expense = expense;
             Date = date;
             Note = note;
-            Image = image;
         }
 
         public int Id { get; set; }
@@ -24,6 +23,6 @@
         public double Expense { get; set; }
         public DateTime Date { get; set; }
         public string? Note { get; set; }
-        public byte[]? Image { get; set; }
+        //public byte[]? Image { get; set; }
     }
 }

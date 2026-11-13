@@ -1,7 +1,7 @@
 ﻿using System.ComponentModel.DataAnnotations;
 using System.Diagnostics.CodeAnalysis;
 
-namespace FinanceDashboard.Model
+namespace FinanceDashboard.Client.DTO
 {
     /// <summary>
     /// What a caller sends to create (POST) or edit (PUT) an expense.
@@ -27,8 +27,8 @@ namespace FinanceDashboard.Model
         [MaxLength(500)]
         public string? Note { get; set; }
 
-        [Required]
-        public byte[]? Image { get; set; }
+        //[Required]
+        //public byte[]? Image { get; set; }
     }
 
 }
