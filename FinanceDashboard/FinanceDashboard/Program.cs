@@ -4,6 +4,7 @@ using FinanceDashboard.Client.Services;
 using FinanceDashboard.Components;
 using FinanceDashboard.Data;
 using Microsoft.EntityFrameworkCore;
+using MudBlazor.Services;
 
 
 var builder = WebApplication.CreateBuilder(args);
@@ -15,13 +16,15 @@ builder.Services.AddRazorComponents()
 builder.Services.AddScoped<IExpenseService, ExpenseService>();
 builder.Services.AddControllers();
 
-builder.Services.Configure<ImageSettings>(
-    builder.Configuration.GetSection("ImageSettings"));
+//builder.Services.Configure<ImageSettings>(
+//    builder.Configuration.GetSection("ImageSettings"));
 
 builder.Services.AddDbContext<FinanceDbContext>(options =>
 {
     options.UseSqlServer(builder.Configuration.GetConnectionString("FinanceDbContext"));
 });
+
+builder.Services.AddMudServices();
 
 var app = builder.Build();
 
