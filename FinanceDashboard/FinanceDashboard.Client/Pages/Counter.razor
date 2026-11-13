@@ -8,11 +8,13 @@
 @using System.Net
 @* @using ApexCharts; *@
 @using MudBlazor;
+@using static MudBlazor.CategoryTypes
 @inject IExpenseService ExpenseService
 
-<PageTitle>Counter</PageTitle>
+<PageTitle>Expenses</PageTitle>
+<MudPopoverProvider />
 
-<h1>Counter</h1>
+<h1>Expenses for @universalYear</h1>
 
 @if (errorMessage is not null)
 {
@@ -25,186 +27,111 @@
 }
 else
 {
-    <section>
-        <YearSelector Years="availableYears" SelectedYear="universalYear" OnSelected="SelectUniversalYear" />
 
-        <section class="mb-5">
-            <h3>First @FirstEntriesCount entries</h3>
+        @* Year buttons *@
+            <YearSelector Years="availableYears" SelectedYear="universalYear" OnSelected="SelectUniversalYear" />
 
-            @if (totalEntries == 0)
+        @* Categories table *@
+            <h3>Categories for @(_monthNames.GetValue(selectedMonth).ToString() ?? "") @universalYear</h3>
+            <MudTable Items="@categories"
+                      Dense="true"
+                      Striped="true"
+                      Hover="true"
+                      Elevation="0">
+
+                <HeaderContent>
+                    <MudTh>Category</MudTh>
+                    <MudTh Align="Align.Right">Total</MudTh>
+                    <MudTh Align="Align.Right">Share</MudTh>
+                </HeaderContent>
+
+                <RowTemplate>
+                    <MudTd DataLabel="Category">@context.Category</MudTd>
+                    <MudTd DataLabel="Total" Align="Align.Right">@Money(context.Total)</MudTd>
+                    <MudTd DataLabel="Share" Align="Align.Right">@Percent(context.Percent)</MudTd>
+                </RowTemplate>
+
+                <FooterContent>
+                    <MudTd><strong>Total</strong></MudTd>
+                    <MudTd Align="Align.Right"><strong>@Money(categories.Sum(x => x.Total))</strong></MudTd>
+                    <MudTd Align="Align.Right"><strong>@Percent(categories.Sum(x => x.Percent))</strong>                    </MudTd>
+                </FooterContent>
+            </MudTable>
+
+        @* Donut chart *@
+            <MudChart T="double" ChartType="ChartType.Donut" Width="100%" Height="300px" ChartSeries="@DataCategories.AsChartDataSet()" ChartLabels="@LabelCategories">
+                <CustomGraphics>
+                    <text class="mud-donut-text mud-typography-h3" x="50%" y="50%">@Money(DataCategories.Sum())</text>
+                </CustomGraphics>
+            </MudChart>
+
+            @foreach (var item in _monthNames.Select((value, i) => new { i, value }).Where(s => !string.IsNullOrWhiteSpace(s.value)))
             {
-                <div class="alert alert-warning">The database has no entries yet.</div>
+                <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="@(() => SelectedMonth(item.i))">@item.value</MudButton>
             }
-            else
-            {
-                <p>Showing @firstEntries.Count of @totalEntries entries.</p>
-                <table class="table table-sm table-striped w-auto">
-                    <thead>
-                        <tr>
-                            <th>Id</th>
-                            <th>Date</th>
-                            <th>Category</th>
-                            <th class="text-end">Expense</th>
-                            <th>Note</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var entry in firstEntries)
-                        {
-                            <tr>
-                                <td>@entry.Id</td>
-                                <td>@entry.Date.ToString("yyyy-MM-dd")</td>
-                                <td>@entry.Category</td>
-                                <td class="text-end">@Money(entry.Expense)</td>
-                                <td>@(entry.Note ?? "–")</td>
-                            </tr>
-                        }
-                    </tbody>
-                </table>
-            }
-        </section>
 
-        <section class="mb-5">
-            <h3>Total cost</h3>
-            <p>Total cost for @universalYear: <strong>@Money(totalCost)</strong></p>
-        </section>
+        @* Monthly expenses table *@
+        <h3>Monthly expenses</h3>
+        <MudTable Items="monthlyExpenses.Select((expense, index) => new { Month = index + 1, Expense = expense })"
+                  Dense="true" Striped="true" Hover="true" Bordered="false" Elevation="0">
 
-        <section class="mb-5">
-            <h3>Categories</h3>
-            <table class="table table-sm table-striped w-auto">
-                <thead>
-                    <tr>
-                        <th>Category</th>
-                        <th class="text-end">Total</th>
-                        <th class="text-end">Share</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach (var row in categories)
-                    {
-                        <tr>
-                            <td>@row.Category</td>
-                            <td class="text-end">@Money(row.Total)</td>
-                            <td class="text-end">@Percent(row.Percent)</td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
+            <HeaderContent>
+                <MudTh>Month</MudTh>
+                <MudTh Align="Align.Right">Expenses</MudTh>
+            </HeaderContent>
 
-            <div>
-                @* <ApexChart TItem="CategoryRow" Title="Expenses per Category" @ref="categoryChartBla">
-            <ApexPointSeries TItem="CategoryRow"
-            Items="categories"
-            Name="Categories"
-            SeriesType="SeriesType.Donut"
-            XValue="@(m => m.Category)"
-            YValue="@(m => (decimal)m.Percent)" />
-            </ApexChart> *@
+            <RowTemplate>
+                <MudTd DataLabel="Month">@MonthName(context.Month)</MudTd>
+                <MudTd DataLabel="Expenses" Align="Align.Right">@Money(context.Expense)</MudTd>
+            </RowTemplate>
 
-                <MudChart T="double" ChartType="ChartType.Donut" Width="100%" Height="300px" ChartSeries="@DataCategories.AsChartDataSet()" ChartLabels="@Labels">
-                    <CustomGraphics>
-                        <text class="mud-donut-text mud-typography-h3" x="50%" y="50%">@DataCategories.Sum()</text>
-                    </CustomGraphics>
-                </MudChart>
-            </div>
+            <FooterContent>
+                <MudTd><strong>Total</strong></MudTd>
+                <MudTd Align="Align.Right"><strong>@Money(totalExpense)</strong></MudTd>
+            </FooterContent>
+        </MudTable>
 
-        </section>
+        @* Bar chart *@
+        <MudChart T="double" ChartType="ChartType.Bar" ChartSeries="@_seriesMonthlyExpense" ChartLabels="@_monthNames"
+                  ChartOptions="@_options"
+                  Width="100%"
+                  Height="350px" />
 
-        <section class="mb-5">
-            <h3>Monthly expenses</h3>
-            <table class="table table-sm table-striped w-auto">
-                <thead>
-                    <tr>
-                        <th>Month</th>
-                        <th class="text-end">Expenses</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @for (var month = 1; month <= monthlyExpenses.Count; month++)
-                    {
-                        <tr>
-                            <td>@MonthName(month)</td>
-                            <td class="text-end">@Money(monthlyExpenses[month - 1])</td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
 
-            <MudChart T="double" ChartType="ChartType.Bar" ChartSeries="@_series" ChartLabels="@_xAxisLabels"
-                      ChartOptions="@_options" Width="100%" Height="350px" />
-
-        </section>
-
-        <section class="mb-5">
-            <h3>Ranking</h3>
-            <div class="mb-3">
-                <label class="form-label" for="min-expense">Minimum expense (€)</label>
-                <div class="input-group w-auto">
-                    <input id="min-expense" class="form-control" type="number" step="0.1"
-                           @bind="minRankingExpense" @bind:event="oninput" />
-                    <button type="button" class="btn btn-primary" @onclick="ShowRanking">Show ranking</button>
-                </div>
-            </div>
-
-            @if (ranking.Count == 0)
-            {
-                <p class="text-muted">No entries with a note cost at least @(Money(minRankingExpense)).</p>
-            }
-            else
-            {
-                <table class="table table-sm table-striped w-auto">
-                    <thead>
-                        <tr>
-                            <th>#</th>
-                            <th>Item</th>
-                            <th>Date</th>
-                            <th class="text-end">Expense</th>
-                            <th>Image</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @for (var rank = 1; rank <= Math.Min(ranking.Count, RankingRowsShown); rank++)
-                        {
-                            var item = ranking[rank - 1];
-                            string? imageSrc = item.Image is { Length: > 0 } imageBytes
-                            ? $"data:image/jpeg;base64,{Convert.ToBase64String(imageBytes)}"
-                            : null;
-
-                            <tr>
-                                <td>@rank</td>
-                                <td>@item.Note</td>
-                                <td>@item.Date.ToString("yyyy-MM-dd")</td>
-                                <td class="text-end">@Money(item.Expense)</td>
-                                <td>
-                                    @if (imageSrc is not null)
-                                    {
-                                        <img src="@imageSrc"
-                                             alt="@item.Note"
-                                             style="max-width: 100px; max-height: 100px; object-fit: contain;"
-                                             loading="lazy" />
-                                    }
-                                    else
-                                    {
-                                        <span class="text-muted">No image</span>
-                                    }
-                                </td>
-                            </tr>
-                        }
-                    </tbody>
-                </table>
-
-                @if (ranking.Count > RankingRowsShown)
-                {
-                    <p class="text-muted">... and @(ranking.Count - RankingRowsShown) more.</p>
-                    <button type="button" @onclick="ShowMoreFromRanking">Show more entries</button>
-                }
-            }
-        </section>
-    </section>
+        @* Table with filte sort*@
+        <MudTable Items="@allEntires" Filter="new Func<ExpensesModel,bool>(FilterFunc1)" Hover="true" RowsPerPage="10" SortLabel="Sort By" Breakpoint="Breakpoint.Sm" LoadingProgressColor="Color.Info">
+            <ToolBarContent>
+                <MudText Typo="Typo.h6">Expenses Table</MudText>
+                <MudSpacer />
+                <MudTextField @bind-Value="searchString"
+                              Placeholder="Search..."
+                              Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Filled.Search"
+                              IconSize="Size.Medium"
+                              Class="mt-0" />
+            </ToolBarContent>
+            <HeaderContent>
+                <MudTh><MudTableSortLabel SortBy="new Func<ExpensesModel, object>(x=>x.Id)">Id</MudTableSortLabel></MudTh>
+                <MudTh><MudTableSortLabel InitialDirection="SortDirection.Ascending" SortBy="new Func<ExpensesModel, object>(x=>x.Category)">Category</MudTableSortLabel></MudTh>
+                <MudTh><MudTableSortLabel SortBy="new Func<ExpensesModel, object>(x=>x.Expense)">Expense</MudTableSortLabel></MudTh>
+                <MudTh><MudTableSortLabel SortBy="new Func<ExpensesModel, object>(x=>x.Date)">Date</MudTableSortLabel></MudTh>
+                <MudTh>Note</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Id">@context.Id</MudTd>
+                <MudTd DataLabel="Category">@context.Category</MudTd>
+                <MudTd DataLabel="Expense">@Money(context.Expense)</MudTd>
+                <MudTd DataLabel="Date">@context.Date.ToString("dd.MM.yyyy")</MudTd>
+                <MudTd DataLabel="Note">@context.Note</MudTd>
+            </RowTemplate>
+            <PagerContent>
+                <MudTablePager PageSizeOptions="new int[] { 5, 10, 25, 50, 100 }" />
+            </PagerContent>
+        </MudTable>
 }
 
 @code {
-    private const int FirstEntriesCount = 5;
+    private const int FirstEntriesCount = 30;
     private int RankingRowsShown = 10;
 
     // One row of the category table. Total and share come from two separate service calls.
@@ -214,13 +141,13 @@ else
     private bool isLoading = true;
     private string? errorMessage;
 
-    private List<ExpensesModel> firstEntries = new();
+    private List<ExpensesModel> allEntires = new();
     private int totalEntries;
 
     private List<int> availableYears = new();
 
     private int universalYear;
-    private double totalCost;
+    private double totalExpense;
 
     private List<CategoryRow> categories = new();
 
@@ -237,16 +164,23 @@ else
     private readonly BarChartOptions _options = new() { ShowValues = true };
 
     //Mudblazor components
-    private List<ChartSeries<double>> _series = new(); /* { Name = "United States", Data = new double[] { 40, 20, 25, 27, 46 } } */
-    private string[] _xAxisLabels;
+    private List<ChartSeries<double>> _seriesMonthlyExpense = new(); /* { Name = "United States", Data = new double[] { 40, 20, 25, 27, 46 } } */
+    private static string[] _monthNames = CultureInfo.CurrentCulture.DateTimeFormat.MonthNames.ToArray();
     private static double[] DataCategories; /* [25, 77, 28, 5]; */
-    private static string[] Labels; /* ["Oil", "Coal", "Gas", "Biomass"]; */
+    private static string[] LabelCategories; /* ["Oil", "Coal", "Gas", "Biomass"]; */
+    private int selectedMonth = 12;
+    private string searchString = "";
+    // private bool enabledSorting = true;
+
+
+    // [Parameter]
+    // public EventCallback<string> OnSelected { get; set; }
 
     protected override async Task OnInitializedAsync()
     {
         try
         {
-            firstEntries = ExpenseService.GetFirst(FirstEntriesCount);
+            allEntires = ExpenseService.GetAllEntriesForTable();
             totalEntries = ExpenseService.GetCount();
             availableYears = (await ExpenseService.GetAllYears()).OrderByDescending(year => year).ToList();
 
@@ -270,7 +204,7 @@ else
     }
 
     private void LoadTotalCost() =>
-        totalCost = ExpenseService.TotalExpenseOfTheYear(universalYear);
+        totalExpense = ExpenseService.TotalExpenseOfTheYear(universalYear);
 
     private void LoadCategories()
     {
@@ -279,26 +213,45 @@ else
 
         // var blal = ExpenseService.ExpenseByCategory(universalYear);
         categories.Clear();
+        selectedMonth = 12;
         foreach (var item in ExpenseService.ExpenseByCategory(universalYear))
         {
-            var percent = totalCost > 0 ? item.Expense / totalCost * 100 : 0;
-            categories.Add(new CategoryRow(item.Category, item.Expense, Math.Round(percent, 2)));
+            var percent = totalExpense > 0 ? item.Expense / totalExpense * 100 : 0;
+            categories.Add(new CategoryRow(item.Category, Math.Round(item.Expense, 2), Math.Round(percent, 2)));
         }
         @*         categories = ExpenseService.ExpenseByCategory(universalYear)
         .Select(item => new CategoryRow(item.Category, item.Expense, )
             .ToList();
  *@
         DataCategories = categories.Select(s => s.Total).ToArray();
-        Labels = categories.Select(s => s.Category).ToArray();
+        LabelCategories = categories.Select(s => s.Category).ToArray();
+    }
+
+    private void LoadCategoriesByMonth()
+    {
+        categories.Clear();
+        var expensesByCategory = ExpenseService.ExpenseByCategory(universalYear, selectedMonth);
+        var totalCost = expensesByCategory.Select(s => s.Expense).Sum();
+
+        foreach (var item in expensesByCategory)
+        {
+            // var percent = totalCost > 0 ? item.Expense / totalCost * 100 : 0;
+            var percent = (item.Expense / totalCost) * 100;
+            categories.Add(new CategoryRow(item.Category, Math.Round(item.Expense, 2), Math.Round(percent, 2)));
+        }
+
+        DataCategories = categories.Select(s => s.Total).ToArray();
+        LabelCategories = categories.Select(s => s.Category).ToArray();
+
+        StateHasChanged();
     }
 
     private void LoadMonthlyExpenses()
     {
         monthlyExpenses = ExpenseService.MonthlyExpense(universalYear);
 
-        _xAxisLabels = CultureInfo.CurrentCulture.DateTimeFormat.MonthNames;
-        _series.Clear();
-        _series.Add(new()
+        _seriesMonthlyExpense.Clear();
+        _seriesMonthlyExpense.Add(new()
             {
                 Name = $"Expenses for the year {universalYear}",
                 Data = monthlyExpenses.ToArray()
@@ -340,14 +293,11 @@ else
         @* await UpdateApexChart(); *@
     }
 
-    @*     private async Task UpdateApexChart()
+    private void SelectedMonth(int monthIndex)
     {
-        if (monthlyChart is not null)
-            await monthlyChartBla.UpdateSeriesAsync(animate: true);
-
-        if (categories is not null)
-            await categoryChartBla.UpdateSeriesAsync(animate: true);
-    } *@
+        selectedMonth = monthIndex;
+        LoadCategoriesByMonth();
+    }
 
     private void ShowRanking()
     {
@@ -369,6 +319,20 @@ else
         }
     }
 
+    private bool FilterFunc1(ExpensesModel element) => FilterFunc(element, searchString);
+
+    private bool FilterFunc(ExpensesModel element, string searchString)
+    {
+        if (string.IsNullOrWhiteSpace(searchString))
+            return true;
+        // if (element.Note.Contains(searchString, StringComparison.OrdinalIgnoreCase))
+        //     return true;
+        // if (element.Name.Contains(searchString, StringComparison.OrdinalIgnoreCase))
+        //     return true;
+        // if ($"{element.Number} {element.Position} {element.Molar}".Contains(searchString))
+        //     return true;
+        return element.Note?.Contains(searchString, StringComparison.OrdinalIgnoreCase) ?? false;
+    }
     private void ReportError(Exception ex) =>
         errorMessage = $"Could not load data from the database: {ex.Message}";
 

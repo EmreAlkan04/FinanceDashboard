@@ -10,14 +10,15 @@ namespace FinanceDashboard.Client.Services
     public interface IExpenseService
     {
         /// <summary>The first <paramref name="count"/> expenses, ordered by Id.</summary>
-        List<ExpensesModel> GetFirst(int count);
+        List<ExpensesModel> GetAllEntriesForTable();
+
 
         /// <summary>Total number of expenses in the database.</summary>
         int GetCount();
 
         double TotalExpenseOfTheYear(int? year = null);
 
-        List<CategoryCostDTO> ExpenseByCategory(int? year = null);
+        List<CategoryCostDTO> ExpenseByCategory(int? year = null, int? month = null);
         List<double> MonthlyExpense(int? year = null);
         double PercentageConverter(string category, double expenseOfCategory, int? year = null);
         List<FinanceDashboard.Model.ExpensesModel> Ranking(double? minExp = 00.00, int? year = null);

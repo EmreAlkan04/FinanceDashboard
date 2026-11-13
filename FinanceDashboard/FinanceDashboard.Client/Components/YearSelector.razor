@@ -3,12 +3,10 @@
 <div class="mb-3">
     @foreach (var year in Years)
     {
-        <button type="button"
-                class="btn me-1 @(year == SelectedYear ? "btn-primary" : "btn-outline-primary")"
-                aria-pressed="@(year == SelectedYear ? "true" : "false")"
-                @onclick="() => OnSelected.InvokeAsync(year)">
+        <MudBlazor.MudButton Variant="MudBlazor.Variant.Outlined" Color="MudBlazor.Color.Primary"
+                             @onclick="() => OnSelected.InvokeAsync(year)">
             @year
-        </button>
+        </MudBlazor.MudButton>
     }
 </div>
 

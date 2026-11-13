@@ -26,12 +26,13 @@ namespace FinanceDashboard.Data
             _imageSettings = imageSettings.Value;
         }
 
-        public List<ExpensesModel> GetFirst(int count) =>
-            _db.Expenses
+        public List<ExpensesModel> GetAllEntriesForTable()
+        {
+            return _db.Expenses
                .AsNoTracking()
-               .OrderBy(e => e.Id)
-               .Take(count)
+               .OrderByDescending(e => e.Id)
                .ToList();
+        }
 
         public int GetCount() => _db.Expenses.Count();
 
@@ -64,7 +65,7 @@ namespace FinanceDashboard.Data
             return totalExpense;
         }
 
-        public List<CategoryCostDTO> ExpenseByCategory(int? year = null)
+        public List<CategoryCostDTO> ExpenseByCategory(int? year = null, int? month = null)
         {
             year ??= DateTime.Now.Year;
 
@@ -72,7 +73,7 @@ namespace FinanceDashboard.Data
             //List<CategoryCostDTO> list = new List<CategoryCostDTO>();
 
             return _db.Expenses
-                 .Where(s => s.Date.Year.Equals(year))
+                 .Where(s => s.Date.Year.Equals(year) && (!month.HasValue || s.Date.Month == (month + 1)))
                  .GroupBy(s => s.Category)
                  .OrderByDescending(s => s.Sum(a => a.Expense))
                  .Select(g => new CategoryCostDTO(g.Key, g.Sum(s => s.Expense)))
@@ -162,6 +163,10 @@ namespace FinanceDashboard.Data
 
         public ExpensesModel AddExpense(ExpenseDTO dto)
         {
+            if (string.IsNullOrWhiteSpace(dto.Note) ||
+                string.Equals(dto.Note.Trim(), "null", StringComparison.OrdinalIgnoreCase))
+                dto.Note = null;
+
             Validate(dto);
 
             var expense = new ExpensesModel();
